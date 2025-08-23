@@ -43,12 +43,12 @@ class ClientExtension:
 class ChromeExtensionServer:
     def __init__(self):
         self.tools = {}
-        self.sse_clients = {}  # client_id: asyncio.Queue
+        self.sse_clients: Dict[str, ClientExtension] = {}  # client_id: asyncio.Queue
         self.pending_requests = {}
 
-    async def add_sse_client(self, client_id, client_queue):
-        self.sse_clients[client_id] = client_queue
-        logger.info(f"SSE client connected: {client_id}. Total clients: {len(self.sse_clients)}")
+    async def add_sse_client(self, client: ClientExtension):
+        self.sse_clients[client.client_id] = client
+        logger.info(f"SSE client connected: {client.client_id}. Total clients: {len(self.sse_clients)}")
 
     async def remove_sse_client(self, client_id):
         if client_id in self.sse_clients:
@@ -66,23 +66,16 @@ class ChromeExtensionServer:
         message_str = json.dumps(message)
         logger.info(f"Broadcasting to Chrome: {json.dumps(message, indent=2, ensure_ascii=False)}")
         disconnected_clients = []
-        if client_id:
-            client_queue = self.sse_clients.get(client_id)
-            if client_queue:
-                try:
-                    await client_queue.put(message_str)
-                    logger.info(f"Message sent to client {client_id}")
-                except Exception as e:
-                    logger.error(f"Failed to send message to client {client_id}: {e}")
-                    disconnected_clients.append(client_id)
+        client = self.sse_clients.get(client_id)
+        if client:
+            try:
+                await client.msg_queue.put(message_str)
+                logger.info(f"Message sent to client {client_id}")
+            except Exception as e:
+                logger.error(f"Failed to send message to client {client_id}: {e}")
+                disconnected_clients.append(client_id)
         else:
-            for cid, client_queue in self.sse_clients.items():
-                try:
-                    await client_queue.put(message_str)
-                    logger.info(f"Message sent to client {cid}")
-                except Exception as e:
-                    logger.error(f"Failed to send message to client {cid}: {e}")
-                    disconnected_clients.append(cid)
+            logger.info(f"Client {client_id} not found. Broadcasting to nothing.")
         for cid in disconnected_clients:
             await self.remove_sse_client(cid)
         logger.info(f"Broadcast completed. Sent to client {client_id}")
@@ -164,7 +157,8 @@ async def _sse(request: Request):
     if not client_id:
         return PlainTextResponse('Missing client_id', status_code=400)
     client_queue = asyncio.Queue()
-    await server.add_sse_client(client_id, client_queue)
+    client = ClientExtension(client_id=client_id, msg_queue=client_queue)
+    await server.add_sse_client(client)
     async def event_generator():
         try:
             yield json.dumps({'type': MESSAGE_TYPE_CONNECTED, 'message': 'SSE connection established', 'client_id': client_id})
