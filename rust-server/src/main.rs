@@ -489,14 +489,13 @@ async fn sse_handler_with_guard_v3(
 ) -> Sse<impl Stream<Item = Result<axum::response::sse::Event, Infallible>>> {
     let client_id = params.client_id.clone();
     let (tx, rx) = mpsc::unbounded_channel();
-
     let client = ClientExtension {
         client_id: client_id.clone(),
         sender: tx.clone(),
         tools: Arc::new(tokio::sync::RwLock::new(None)),
     };
-
     state.add_sse_client(client).await;
+    let stream = GuardedSseStream::new(rx, client_id.clone(), state);
 
     // 发送连接确认消息
     let connected_msg = SseMessage {
@@ -505,12 +504,9 @@ async fn sse_handler_with_guard_v3(
         timestamp: Utc::now(),
         request_id: None,
         message: Some("SSE connection established".to_string()),
-        client_id: Some(client_id.clone()),
+        client_id: Some(client_id),
     };
-
     let _ = tx.send(serde_json::to_string(&connected_msg).unwrap_or_default());
-
-    let stream = GuardedSseStream::new(rx, client_id, state);
 
     Sse::new(stream).keep_alive(
         axum::response::sse::KeepAlive::new()
