@@ -3,6 +3,7 @@
  * Handles Server-Sent Events connection and bidirectional communication
  */
 
+import { TOOL_SCHEMAS } from 'chrome-mcp-shared';
 import { BACKGROUND_MESSAGE_TYPES } from '@/common/message-types';
 import { handleCallTool } from './tools';
 import { ICONS, NOTIFICATIONS, STORAGE_KEYS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/common/constants';
@@ -211,14 +212,12 @@ class PythonSSEClient {
    * Get tools response for Python server
    */
   private async getToolsResponse(): Promise<any> {
+    console.log(this.tools);
+    console.log(TOOL_SCHEMAS);
     const toolsList = Array.from(this.tools.keys());
     return {
       success: true,
-      data: {
-        tools: toolsList,
-        count: toolsList.length,
-        timestamp: Date.now()
-      }
+      data: TOOL_SCHEMAS
     };
   }
 

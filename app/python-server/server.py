@@ -120,7 +120,7 @@ class ChromeExtensionServer:
             response = await self.request_from_chrome(client_id, OP_TYPE_GET_TOOLS, {})
             if response.get("success"):
                 tools = response.get("data", {})
-                logger.info(f"Successfully received {len(tools.get('tools', []))} tools from Chrome")
+                logger.info(f"Successfully received {len(tools)} tools from Chrome")
                 return tools
             else:
                 logger.error(f"Failed to get tools from Chrome: {response.get('error')}")
@@ -205,7 +205,7 @@ async def list_tools(request: Request):
             "error": "Client not connected"
         }, status_code=400)
     try:
-        tools = server.get_tools_from_chrome(client_id)
+        tools = await server.get_tools_from_chrome(client_id)
         return JSONResponse({
             "success": True,
             "data": tools
