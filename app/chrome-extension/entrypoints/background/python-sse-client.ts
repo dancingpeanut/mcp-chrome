@@ -86,7 +86,7 @@ class PythonSSEClient {
       if (!this.clientId) {
         this.clientId = await getOrCreateClientId();
       }
-      const sseUrl = `${this.serverUrl}/sse?client_id=${encodeURIComponent(this.clientId)}`;
+      const sseUrl = `${this.serverUrl}/_sse?client_id=${encodeURIComponent(this.clientId)}`;
       console.log(`PythonSSEClient: Connecting to ${sseUrl}`);
       this.eventSource = new EventSource(sseUrl);
       this.eventSource.onopen = () => {

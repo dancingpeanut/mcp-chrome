@@ -151,7 +151,7 @@ class ChromeExtensionServer:
 server = ChromeExtensionServer()
 
 # SSE endpoint for Chrome extension to connect
-async def sse(request: Request):
+async def _sse(request: Request):
     client_id = request.query_params.get('client_id')
     if not client_id:
         return PlainTextResponse('Missing client_id', status_code=400)
@@ -248,7 +248,7 @@ async def call_tool(request: Request):
         }, status_code=500)
 
 routes = [
-    Route('/sse', sse),
+    Route('/_sse', _sse),
     Route('/api/chrome/response', chrome_response, methods=["POST"]),
     Route('/api/tool/list', list_tools, methods=["GET"]),
     Route('/api/tool/call', call_tool, methods=["GET"]),
