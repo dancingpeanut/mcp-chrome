@@ -1,3 +1,6 @@
+mod proxy;
+mod guard_sse_stream;
+
 use axum::{
     extract::{Query, State},
     http::StatusCode,
