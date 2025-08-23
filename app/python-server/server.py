@@ -5,7 +5,7 @@ Replaces Native Host and MCP Server functionality
 Supports both HTTP API and Server-Sent Events (SSE) for bidirectional communication
 """
 from starlette.applications import Starlette
-from starlette.responses import JSONResponse, Response, PlainTextResponse
+from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.requests import Request
 from starlette.routing import Route
 from starlette.middleware.cors import CORSMiddleware
