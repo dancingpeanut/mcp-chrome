@@ -14,6 +14,8 @@ use std::{
     convert::Infallible,
     sync::Arc,
     time::Duration,
+    pin::Pin,
+    task::{Context, Poll},
 };
 use tokio::{
     sync::{mpsc, oneshot},
@@ -360,79 +362,159 @@ struct SseQuery {
     client_id: String,
 }
 
-async fn sse_handler(
+struct AdvancedSseConnectionGuard {
+    client_id: String,
+    state: AppState,
+    connected_at: DateTime<Utc>,
+    bytes_sent: Arc<std::sync::atomic::AtomicU64>,
+    messages_sent: Arc<std::sync::atomic::AtomicU64>,
+}
+
+impl AdvancedSseConnectionGuard {
+    fn new(client_id: String, state: AppState) -> Self {
+        Self {
+            client_id,
+            state,
+            connected_at: Utc::now(),
+            bytes_sent: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            messages_sent: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+        }
+    }
+
+    fn track_message(&self, message_size: usize) {
+        self.bytes_sent.fetch_add(message_size as u64, std::sync::atomic::Ordering::Relaxed);
+        self.messages_sent.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    fn get_stats(&self) -> (u64, u64, Duration) {
+        let bytes = self.bytes_sent.load(std::sync::atomic::Ordering::Relaxed);
+        let messages = self.messages_sent.load(std::sync::atomic::Ordering::Relaxed);
+        let duration = Utc::now().signed_duration_since(self.connected_at);
+        (bytes, messages, duration.to_std().unwrap_or(Duration::ZERO))
+    }
+}
+
+impl Drop for AdvancedSseConnectionGuard {
+    fn drop(&mut self) {
+        let client_id = self.client_id.clone();
+        let state = self.state.clone();
+        let (bytes, messages, duration) = self.get_stats();
+
+        info!(
+            "AdvancedSseConnectionGuard dropped for client: {} (bytes: {}, messages: {}, duration: {:?})",
+            client_id, bytes, messages, duration
+        );
+
+        // 异步清理
+        tokio::spawn(async move {
+            state.remove_sse_client(&client_id).await;
+            info!(
+                "SSE client {} cleaned up - Stats: {} bytes, {} messages, {:?} duration",
+                client_id, bytes, messages, duration
+            );
+        });
+    }
+}
+
+struct GuardedSseStream {
+    rx: mpsc::UnboundedReceiver<String>,
+    keepalive: tokio::time::Interval,
+    client_id: String,
+    _guard: AdvancedSseConnectionGuard, // 保持 guard 存活
+}
+
+impl GuardedSseStream {
+    fn new(
+        rx: mpsc::UnboundedReceiver<String>,
+        client_id: String,
+        state: AppState,
+    ) -> Self {
+        Self {
+            rx,
+            keepalive: interval(Duration::from_secs(30)),
+            client_id: client_id.clone(),
+            _guard: AdvancedSseConnectionGuard::new(client_id, state),
+        }
+    }
+}
+
+impl Stream for GuardedSseStream {
+    type Item = Result<axum::response::sse::Event, Infallible>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // 检查是否有新消息
+        match self.rx.poll_recv(cx) {
+            Poll::Ready(Some(message)) => {
+                // 记录消息统计
+                self._guard.track_message(message.len());
+
+                return Poll::Ready(Some(Ok(
+                    axum::response::sse::Event::default().data(message)
+                )));
+            }
+            Poll::Ready(None) => {
+                // Channel closed
+                info!("Channel closed for client {}", self.client_id);
+                return Poll::Ready(None); // 这会触发 Drop
+            }
+            Poll::Pending => {}
+        }
+
+        // 检查 keepalive
+        if let Poll::Ready(_) = self.keepalive.poll_tick(cx) {
+            let keepalive_msg = SseMessage {
+                message_type: MESSAGE_TYPE_KEEPALIVE.to_string(),
+                payload: None,
+                timestamp: Utc::now(),
+                request_id: None,
+                message: None,
+                client_id: Some(self.client_id.clone()),
+            };
+
+            let message_str = serde_json::to_string(&keepalive_msg).unwrap_or_default();
+            self._guard.track_message(message_str.len());
+
+            return Poll::Ready(Some(Ok(
+                axum::response::sse::Event::default().data(message_str)
+            )));
+        }
+
+        Poll::Pending
+    }
+}
+
+async fn sse_handler_with_guard_v3(
     Query(params): Query<SseQuery>,
     State(state): State<AppState>,
 ) -> Sse<impl Stream<Item = Result<axum::response::sse::Event, Infallible>>> {
     let client_id = params.client_id.clone();
-    let (tx, mut rx) = mpsc::unbounded_channel();
+    let (tx, rx) = mpsc::unbounded_channel();
 
     let client = ClientExtension {
         client_id: client_id.clone(),
-        sender: tx,
+        sender: tx.clone(),
         tools: Arc::new(tokio::sync::RwLock::new(None)),
     };
 
     state.add_sse_client(client).await;
 
-    let state_clone = state.clone();
-    let client_id_clone = client_id.clone();
-
-    let stream = async_stream::stream! {
-        // Send connected message
-        let connected_msg = SseMessage {
-            message_type: MESSAGE_TYPE_CONNECTED.to_string(),
-            payload: None,
-            timestamp: Utc::now(),
-            request_id: None,
-            message: Some("SSE connection established".to_string()),
-            client_id: Some(client_id.clone()),
-        };
-
-        yield Ok(axum::response::sse::Event::default()
-            .data(serde_json::to_string(&connected_msg).unwrap_or_default()));
-
-        let mut keepalive = interval(Duration::from_secs(30));
-
-        loop {
-            tokio::select! {
-                // Handle incoming messages
-                msg = rx.recv() => {
-                    info!("Received message from client: {:?}", msg);
-                    match msg {
-                        Some(message) => {
-                            yield Ok(axum::response::sse::Event::default().data(message));
-                        }
-                        None => {
-                            // Sender dropped, client disconnected
-                            break;
-                        }
-                    }
-                }
-                // Send keepalive
-                _ = keepalive.tick() => {
-                    let keepalive_msg = SseMessage {
-                        message_type: MESSAGE_TYPE_KEEPALIVE.to_string(),
-                        payload: None,
-                        timestamp: Utc::now(),
-                        request_id: None,
-                        message: None,
-                        client_id: Some(client_id.clone()),
-                    };
-                    yield Ok(axum::response::sse::Event::default()
-                        .data(serde_json::to_string(&keepalive_msg).unwrap_or_default()));
-                }
-            }
-        }
-
-        info!("SSE stream ended for client {}", client_id);
-        // Cleanup when stream ends
-        state_clone.remove_sse_client(&client_id_clone).await;
+    // 发送连接确认消息
+    let connected_msg = SseMessage {
+        message_type: MESSAGE_TYPE_CONNECTED.to_string(),
+        payload: None,
+        timestamp: Utc::now(),
+        request_id: None,
+        message: Some("SSE connection established".to_string()),
+        client_id: Some(client_id.clone()),
     };
+
+    let _ = tx.send(serde_json::to_string(&connected_msg).unwrap_or_default());
+
+    let stream = GuardedSseStream::new(rx, client_id, state);
 
     Sse::new(stream).keep_alive(
         axum::response::sse::KeepAlive::new()
-            .interval(Duration::from_secs(30))
+            .interval(Duration::from_secs(15))
             .text("keep-alive-text"),
     )
 }
@@ -564,7 +646,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = AppState::new();
 
     let app = Router::new()
-        .route("/_sse", get(sse_handler))
+        .route("/_sse", get(sse_handler_with_guard_v3))
         .route("/api/chrome/response", post(chrome_response_handler))
         .route("/api/tool/list", get(list_tools_handler))
         .route("/api/tool/call", get(call_tool_handler))
