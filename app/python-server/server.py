@@ -4,8 +4,11 @@ Python HTTP Server for Chrome Extension
 Replaces Native Host and MCP Server functionality
 Supports both HTTP API and Server-Sent Events (SSE) for bidirectional communication
 """
-from flask import Flask, request, jsonify, Response, stream_template
-from flask_cors import CORS
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse, Response, PlainTextResponse
+from starlette.requests import Request
+from starlette.routing import Route
+from starlette.middleware.cors import CORSMiddleware
 import json
 import logging
 import threading
@@ -16,6 +19,8 @@ import sys
 import uuid
 from datetime import datetime
 import queue
+from sse_starlette.sse import EventSourceResponse
+import asyncio
 
 # Configure logging
 logging.basicConfig(
@@ -24,7 +29,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 MESSAGE_TYPE_CONNECTED = "connected"
 MESSAGE_TYPE_KEEPALIVE = "keepalive"
 MESSAGE_TYPE_OP = "op"
@@ -32,28 +36,23 @@ MESSAGE_TYPE_OP = "op"
 OP_TYPE_GET_TOOLS = "get_tools"
 OP_TYPE_CALL_TOOL = "call_tool"
 
-
-
-app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
-
 class ChromeExtensionServer:
     def __init__(self):
         self.tools = {}
-        self.sse_clients = {}  # client_id: queue
+        self.sse_clients = {}  # client_id: asyncio.Queue
         self.pending_requests = {}
-        self.request_queue = queue.Queue()
+        self.request_queue = None  # 不再用同步queue
 
-    def add_sse_client(self, client_id, client_queue):
+    async def add_sse_client(self, client_id, client_queue):
         self.sse_clients[client_id] = client_queue
         logger.info(f"SSE client connected: {client_id}. Total clients: {len(self.sse_clients)}")
 
-    def remove_sse_client(self, client_id):
+    async def remove_sse_client(self, client_id):
         if client_id in self.sse_clients:
             del self.sse_clients[client_id]
             logger.info(f"SSE client disconnected: {client_id}. Total clients: {len(self.sse_clients)}")
 
-    def broadcast_to_chrome(self, message_type: str, payload: Any, request_id: str = None, client_id: str = None):
+    async def broadcast_to_chrome(self, message_type: str, payload: Any, request_id: str = None, client_id: str = None):
         """Broadcast or send message to specific Chrome client(s) via SSE"""
         message = {
             "type": message_type,
@@ -61,14 +60,14 @@ class ChromeExtensionServer:
             "timestamp": datetime.now().isoformat(),
             "requestId": request_id
         }
-        message_str = f"data: {json.dumps(message)}\n\n"
+        message_str = json.dumps(message)
         logger.info(f"Broadcasting to Chrome: {json.dumps(message, indent=2, ensure_ascii=False)}")
         disconnected_clients = []
         if client_id:
             client_queue = self.sse_clients.get(client_id)
             if client_queue:
                 try:
-                    client_queue.put(message_str)
+                    await client_queue.put(message_str)
                     logger.info(f"Message sent to client {client_id}")
                 except Exception as e:
                     logger.error(f"Failed to send message to client {client_id}: {e}")
@@ -76,32 +75,33 @@ class ChromeExtensionServer:
         else:
             for cid, client_queue in self.sse_clients.items():
                 try:
-                    client_queue.put(message_str)
+                    await client_queue.put(message_str)
                     logger.info(f"Message sent to client {cid}")
                 except Exception as e:
                     logger.error(f"Failed to send message to client {cid}: {e}")
                     disconnected_clients.append(cid)
         for cid in disconnected_clients:
-            self.remove_sse_client(cid)
+            await self.remove_sse_client(cid)
         logger.info(f"Broadcast completed. Sent to client {client_id}")
 
-    def request_from_chrome(self, client_id: str, op_type: str, payload: Any, timeout: int = 30) -> Any:
+    async def request_from_chrome(self, client_id: str, op_type: str, payload: Any, timeout: int = 30) -> Any:
         request_id = str(uuid.uuid4())
-        response_event = threading.Event()
+        response_event = asyncio.Event()
         response_data = {"success": False, "error": "Timeout"}
         def response_handler(response):
             nonlocal response_data
             response_data = response
             response_event.set()
         self.pending_requests[request_id] = response_handler
-        self.broadcast_to_chrome(MESSAGE_TYPE_OP, {
+        await self.broadcast_to_chrome(MESSAGE_TYPE_OP, {
             "type": op_type,
             "payload": payload
         }, request_id, client_id=client_id)
         logger.info(f"Waiting for Chrome response (timeout: {timeout}s)...")
-        if response_event.wait(timeout):
+        try:
+            await asyncio.wait_for(response_event.wait(), timeout=timeout)
             return response_data
-        else:
+        except asyncio.TimeoutError:
             logger.warning(f"Request timeout after {timeout}s")
             if request_id in self.pending_requests:
                 del self.pending_requests[request_id]
@@ -119,10 +119,10 @@ class ChromeExtensionServer:
         else:
             logger.warning(f"No pending request found for ID: {request_id}")
 
-    def get_tools_from_chrome(self, client_id: str) -> Dict[str, Any]:
+    async def get_tools_from_chrome(self, client_id: str) -> Dict[str, Any]:
         logger.info(f"Requesting tools from Chrome extension... {client_id}")
         try:
-            response = self.request_from_chrome(client_id, OP_TYPE_GET_TOOLS, {})
+            response = await self.request_from_chrome(client_id, OP_TYPE_GET_TOOLS, {})
             if response.get("success"):
                 tools = response.get("data", {})
                 logger.info(f"Successfully received {len(tools.get('tools', []))} tools from Chrome")
@@ -134,11 +134,11 @@ class ChromeExtensionServer:
             logger.error(f"Error getting tools from Chrome: {e}")
             return {}
 
-    def call_chrome_tool(self, client_id: str, tool_name: str, args: Any) -> Dict[str, Any]:
+    async def call_chrome_tool(self, client_id: str, tool_name: str, args: Any) -> Dict[str, Any]:
         logger.info(f"Calling Chrome tool: {tool_name}")
         logger.info(f"   Arguments: {json.dumps(args, indent=2)}")
         try:
-            response = self.request_from_chrome(client_id, OP_TYPE_CALL_TOOL, {
+            response = await self.request_from_chrome(client_id, OP_TYPE_CALL_TOOL, {
                 "name": tool_name,
                 "args": args
             })
@@ -152,134 +152,127 @@ class ChromeExtensionServer:
             logger.error(f"Error calling Chrome tool {tool_name}: {e}")
             return {"success": False, "error": str(e)}
 
-
 # Global server instance
 server = ChromeExtensionServer()
 
-
 # SSE endpoint for Chrome extension to connect
-@app.route('/sse')
-def sse():
-    """Server-Sent Events endpoint for Chrome extension"""
-    client_id = request.args.get('client_id')
+async def sse(request: Request):
+    client_id = request.query_params.get('client_id')
     if not client_id:
-        return Response('Missing client_id', status=400)
-    def generate():
-        client_queue = queue.Queue()
-        server.add_sse_client(client_id, client_queue)
+        return PlainTextResponse('Missing client_id', status_code=400)
+    client_queue = asyncio.Queue()
+    await server.add_sse_client(client_id, client_queue)
+    async def event_generator():
         try:
-            yield f"data: {json.dumps({'type': MESSAGE_TYPE_CONNECTED, 'message': 'SSE connection established', 'client_id': client_id})}\n\n"
+            yield json.dumps({'type': MESSAGE_TYPE_CONNECTED, 'message': 'SSE connection established', 'client_id': client_id})
             while True:
                 try:
-                    message = client_queue.get(timeout=30)
+                    message = await asyncio.wait_for(client_queue.get(), timeout=30)
                     yield message
-                except queue.Empty:
-                    yield f"data: {json.dumps({'type': MESSAGE_TYPE_KEEPALIVE, 'timestamp': datetime.now().isoformat(), 'client_id': client_id})}\n\n"
-        except GeneratorExit:
-            server.remove_sse_client(client_id)
+                except asyncio.TimeoutError:
+                    yield json.dumps({'type': MESSAGE_TYPE_KEEPALIVE, 'timestamp': datetime.now().isoformat(), 'client_id': client_id})
+        except asyncio.CancelledError:
+            await server.remove_sse_client(client_id)
         except Exception as e:
             logger.error(f"SSE error: {e}")
-            server.remove_sse_client(client_id)
-    return Response(generate(), mimetype='text/event-stream')
+            await server.remove_sse_client(client_id)
+    return EventSourceResponse(event_generator())
 
 # Endpoint for Chrome extension to send responses
-@app.route('/api/chrome/response', methods=['POST'])
-def chrome_response():
-    """Handle response from Chrome extension"""
+async def chrome_response(request: Request):
     try:
-        data = request.get_json()
+        data = await request.json()
         if not data:
             logger.warning("Chrome response endpoint: No data provided")
-            return jsonify({"success": False, "error": "No data provided"}), 400
-        
+            return JSONResponse({"success": False, "error": "No data provided"}, status_code=400)
         request_id = data.get('requestId')
         response_data = data.get('response', {})
-
         if request_id:
             server.handle_chrome_response(request_id, response_data)
-            return jsonify({"success": True, "message": "Response received"})
+            return JSONResponse({"success": True, "message": "Response received"})
         else:
             logger.warning("Chrome response endpoint: No request ID provided")
-            return jsonify({"success": False, "error": "No request ID provided"}), 400
-        
+            return JSONResponse({"success": False, "error": "No request ID provided"}, status_code=400)
     except Exception as e:
         logger.error(f"Chrome response endpoint: Failed to handle Chrome response: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
-@app.route('/api/tool/list', methods=['GET'])
-def list_tools():
-    """List all available tools (both local and Chrome)"""
-    client_id = request.args.get('client_id')
+async def list_tools(request: Request):
+    client_id = request.query_params.get('client_id')
     if not client_id:
-        return jsonify({
+        return JSONResponse({
             "success": False,
             "error": "Missing client_id"
-            }), 400
+        }, status_code=400)
     if not server.sse_clients.get(client_id):
-        return jsonify({
+        return JSONResponse({
             "success": False,
             "error": "Client not connected"
-            }), 400
-
+        }, status_code=400)
     try:
-        # Get tools from Chrome
         tools = server.get_tools_from_chrome(client_id)
-        
-        return jsonify({
+        return JSONResponse({
             "success": True,
             "data": tools
         })
     except Exception as e:
         logger.error(f"Failed to list tools: {e}")
-        return jsonify({
+        return JSONResponse({
             "success": False,
             "error": str(e)
-        }), 500
+        }, status_code=500)
 
-
-@app.route('/api/tool/call', methods=['GET'])
-def call_tool():
-    """List all available tools (both local and Chrome)"""
-    client_id = request.args.get('client_id')
+async def call_tool(request: Request):
+    client_id = request.query_params.get('client_id')
     if not client_id:
-        return jsonify({
+        return JSONResponse({
             "success": False,
             "error": "Missing client_id"
-            }), 400
+        }, status_code=400)
     if not server.sse_clients.get(client_id):
-        return jsonify({
+        return JSONResponse({
             "success": False,
             "error": "Client not connected"
-            }), 400
-
+        }, status_code=400)
     try:
         tool_name = 'chrome_navigate'
         tool_args = {
             "url": "https://www.baidu.com/",
             "newWindow": False,
         }
-        result = server.call_chrome_tool(client_id, tool_name, tool_args)
-
-        return jsonify({
+        result = await server.call_chrome_tool(client_id, tool_name, tool_args)
+        return JSONResponse({
             "success": True,
             "data": result
         })
     except Exception as e:
         logger.error(f"Failed to list tools: {e}")
-        return jsonify({
+        return JSONResponse({
             "success": False,
             "error": str(e)
-        }), 500
+        }, status_code=500)
 
+routes = [
+    Route('/sse', sse),
+    Route('/api/chrome/response', chrome_response, methods=["POST"]),
+    Route('/api/tool/list', list_tools, methods=["GET"]),
+    Route('/api/tool/call', call_tool, methods=["GET"]),
+]
+
+app = Starlette(debug=True, routes=routes)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
 
 if __name__ == '__main__':
     import argparse
-    
+    import uvicorn
     parser = argparse.ArgumentParser(description='Chrome Extension Python Server')
     parser.add_argument('--host', default='127.0.0.1', help='Host to bind to')
     parser.add_argument('--port', type=int, default=12306, help='Port to bind to')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
-    
     args = parser.parse_args()
-    
-    app.run(host=args.host, port=args.port, debug=args.debug, threaded=True)
+    uvicorn.run("server:app", host=args.host, port=args.port, reload=args.debug)
