@@ -2,11 +2,30 @@
   <div class="popup-container">
     <div class="header">
       <div class="header-content">
-        <h1 class="header-title">Chrome MCP Server</h1>
+        <h1 class="header-title">KM Server</h1>
       </div>
     </div>
     <div class="content">
+      <!-- 
+        注意：其他功能已隐藏但代码保留
+        要重新显示其他功能，请将对应的 v-if="false" 改为 v-if="true" 或直接删除 v-if 属性
+        
+        隐藏的功能包括：
+        - Native Server 配置
+        - 语义引擎
+        - 嵌入模型
+        - 索引数据管理
+        - 模型缓存管理
+      -->
+      
+      <!-- Python SSE Status Section - 保持显示 -->
       <div class="section">
+        <h2 class="section-title">Python Server SSE</h2>
+        <PythonSSEStatus />
+      </div>
+
+      <!-- 其他部分使用 v-if="false" 隐藏，但保留代码 -->
+      <div v-if="false" class="section">
         <h2 class="section-title">{{ getMessage('nativeServerConfigLabel') }}</h2>
         <div class="config-card">
           <div class="status-section">
@@ -65,7 +84,7 @@
         </div>
       </div>
 
-      <div class="section">
+      <div v-if="false" class="section">
         <h2 class="section-title">{{ getMessage('semanticEngineLabel') }}</h2>
         <div class="semantic-engine-card">
           <div class="semantic-engine-status">
@@ -97,7 +116,7 @@
         </div>
       </div>
 
-      <div class="section">
+      <div v-if="false" class="section">
         <h2 class="section-title">{{ getMessage('embeddingModelLabel') }}</h2>
 
         <ProgressIndicator
@@ -162,7 +181,7 @@
         </div>
       </div>
 
-      <div class="section">
+      <div v-if="false" class="section">
         <h2 class="section-title">{{ getMessage('indexDataManagementLabel') }}</h2>
         <div class="stats-grid">
           <div class="stats-card">
@@ -222,37 +241,42 @@
         </button>
       </div>
 
-      <!-- Model Cache Management Section -->
-      <ModelCacheManagement
-        :cache-stats="cacheStats"
-        :is-managing-cache="isManagingCache"
-        @cleanup-cache="cleanupCache"
-        @clear-all-cache="clearAllCache"
-      />
+      <!-- Model Cache Management Section - 隐藏但保留 -->
+      <div v-if="false">
+        <ModelCacheManagement
+          :cache-stats="cacheStats"
+          :is-managing-cache="isManagingCache"
+          @cleanup-cache="cleanupCache"
+          @clear-all-cache="clearAllCache"
+        />
+      </div>
     </div>
 
     <div class="footer">
-      <p class="footer-text">chrome mcp server for ai</p>
+      <p class="footer-text">Python Server for Chrome Extension</p>
     </div>
 
-    <ConfirmDialog
-      :visible="showClearConfirmation"
-      :title="getMessage('confirmClearDataTitle')"
-      :message="getMessage('clearDataWarningMessage')"
-      :items="[
-        getMessage('clearDataList1'),
-        getMessage('clearDataList2'),
-        getMessage('clearDataList3'),
-      ]"
-      :warning="getMessage('clearDataIrreversibleWarning')"
-      icon="⚠️"
-      :confirm-text="getMessage('confirmClearButton')"
-      :cancel-text="getMessage('cancelButton')"
-      :confirming-text="getMessage('clearingStatus')"
-      :is-confirming="isClearingData"
-      @confirm="confirmClearAllData"
-      @cancel="hideClearDataConfirmation"
-    />
+    <!-- ConfirmDialog - 隐藏但保留 -->
+    <div v-if="false">
+      <ConfirmDialog
+        :visible="showClearConfirmation"
+        :title="getMessage('confirmClearDataTitle')"
+        :message="getMessage('clearDataWarningMessage')"
+        :items="[
+          getMessage('clearDataList1'),
+          getMessage('clearDataList2'),
+          getMessage('clearDataList3'),
+        ]"
+        :warning="getMessage('clearDataIrreversibleWarning')"
+        icon="⚠️"
+        :confirm-text="getMessage('confirmClearButton')"
+        :cancel-text="getMessage('cancelButton')"
+        :confirming-text="getMessage('clearingStatus')"
+        :is-confirming="isClearingData"
+        @confirm="confirmClearAllData"
+        @cancel="hideClearDataConfirmation"
+      />
+    </div>
   </div>
 </template>
 
@@ -272,6 +296,7 @@ import { getMessage } from '@/utils/i18n';
 import ConfirmDialog from './components/ConfirmDialog.vue';
 import ProgressIndicator from './components/ProgressIndicator.vue';
 import ModelCacheManagement from './components/ModelCacheManagement.vue';
+import PythonSSEStatus from './components/PythonSSEStatus.vue';
 import {
   DocumentIcon,
   DatabaseIcon,
@@ -675,10 +700,10 @@ const updatePort = async (event: Event) => {
 const checkNativeConnection = async () => {
   try {
     // eslint-disable-next-line no-undef
-    const response = await chrome.runtime.sendMessage({ type: 'ping_native' });
+    const response = await chrome.runtime.sendMessage({ type: 'PING_HTTP_SERVER' });
     nativeConnectionStatus.value = response?.connected ? 'connected' : 'disconnected';
   } catch (error) {
-    console.error('检测 Native 连接状态失败:', error);
+    console.error('检测 HTTP 服务器连接状态失败:', error);
     nativeConnectionStatus.value = 'disconnected';
   }
 };
@@ -743,13 +768,13 @@ const testNativeConnection = async () => {
   try {
     if (nativeConnectionStatus.value === 'connected') {
       // eslint-disable-next-line no-undef
-      await chrome.runtime.sendMessage({ type: 'disconnect_native' });
+      await chrome.runtime.sendMessage({ type: 'DISCONNECT_HTTP_SERVER' });
       nativeConnectionStatus.value = 'disconnected';
     } else {
       console.log(`尝试连接到端口: ${nativeServerPort.value}`);
       // eslint-disable-next-line no-undef
       const response = await chrome.runtime.sendMessage({
-        type: 'connectNative',
+        type: 'CONNECT_HTTP_SERVER',
         port: nativeServerPort.value,
       });
       if (response && response.success) {

@@ -1,9 +1,10 @@
-import { initNativeHostListener } from './native-host';
+import { initHttpServerListener } from './http-server';
 import {
   initSemanticSimilarityListener,
   initializeSemanticEngineIfCached,
 } from './semantic-similarity';
 import { initStorageManagerListener } from './storage-manager';
+import { initPythonSSEClient } from './python-sse-client';
 import { cleanupModelCache } from '@/utils/semantic-similarity-engine';
 
 /**
@@ -12,9 +13,10 @@ import { cleanupModelCache } from '@/utils/semantic-similarity-engine';
  */
 export default defineBackground(() => {
   // Initialize core services
-  initNativeHostListener();
+  initHttpServerListener();
   initSemanticSimilarityListener();
   initStorageManagerListener();
+  initPythonSSEClient();
 
   // Conditionally initialize semantic similarity engine if model cache exists
   initializeSemanticEngineIfCached()
