@@ -11,8 +11,9 @@ from starlette.routing import Route
 from starlette.middleware.cors import CORSMiddleware
 import json
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from sse_starlette.sse import EventSourceResponse
 import asyncio
@@ -31,12 +32,19 @@ MESSAGE_TYPE_OP = "op"
 OP_TYPE_GET_TOOLS = "get_tools"
 OP_TYPE_CALL_TOOL = "call_tool"
 
+
+@dataclass
+class ClientExtension:
+    client_id: str
+    msg_queue: asyncio.Queue
+    tools: List[Dict[str, Any]] = None
+
+
 class ChromeExtensionServer:
     def __init__(self):
         self.tools = {}
         self.sse_clients = {}  # client_id: asyncio.Queue
         self.pending_requests = {}
-        self.request_queue = None  # 不再用同步queue
 
     async def add_sse_client(self, client_id, client_queue):
         self.sse_clients[client_id] = client_queue
