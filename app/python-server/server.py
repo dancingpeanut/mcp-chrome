@@ -42,7 +42,6 @@ class ClientExtension:
 
 class ChromeExtensionServer:
     def __init__(self):
-        self.tools = {}
         self.sse_clients: Dict[str, ClientExtension] = {}  # client_id: asyncio.Queue
         self.pending_requests = {}
 
@@ -115,7 +114,7 @@ class ChromeExtensionServer:
         else:
             logger.warning(f"No pending request found for ID: {request_id}")
 
-    async def get_tools_from_chrome(self, client_id: str) -> Dict[str, Any]:
+    async def get_tools_from_chrome(self, client_id: str) -> List[Dict[str, Any]]:
         logger.info(f"Requesting tools from Chrome extension... {client_id}")
         try:
             response = await self.request_from_chrome(client_id, OP_TYPE_GET_TOOLS, {})
@@ -147,6 +146,17 @@ class ChromeExtensionServer:
         except Exception as e:
             logger.error(f"Error calling Chrome tool {tool_name}: {e}")
             return {"success": False, "error": str(e)}
+
+    async def get_tools(self, client_id: str) -> List[Dict[str, Any]]:
+        client = self.sse_clients.get(client_id)
+        if client:
+            if client.tools:
+                return client.tools
+            else:
+                client.tools = await self.get_tools_from_chrome(client_id)
+                return client.tools
+        else:
+            raise Exception(f"Client {client_id} not found")
 
 # Global server instance
 server = ChromeExtensionServer()
@@ -207,7 +217,7 @@ async def list_tools(request: Request):
             "error": "Client not connected"
         }, status_code=400)
     try:
-        tools = await server.get_tools_from_chrome(client_id)
+        tools = await server.get_tools(client_id)
         return JSONResponse({
             "success": True,
             "data": tools
