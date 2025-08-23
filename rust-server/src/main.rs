@@ -483,7 +483,7 @@ impl Stream for GuardedSseStream {
     }
 }
 
-async fn sse_handler_with_guard_v3(
+async fn sse_handler(
     Query(params): Query<SseQuery>,
     State(state): State<AppState>,
 ) -> Sse<impl Stream<Item = Result<axum::response::sse::Event, Infallible>>> {
@@ -642,7 +642,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = AppState::new();
 
     let app = Router::new()
-        .route("/_sse", get(sse_handler_with_guard_v3))
+        .route("/_sse", get(sse_handler))
         .route("/api/chrome/response", post(chrome_response_handler))
         .route("/api/tool/list", get(list_tools_handler))
         .route("/api/tool/call", get(call_tool_handler))
