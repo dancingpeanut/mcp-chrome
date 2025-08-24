@@ -25,7 +25,7 @@
       </button>
     </div>
 
-    <div v-if="isConnected" class="tools-info">
+    <div v-if=false class="tools-info">
       <h4>Available Tools</h4>
       <div class="tools-list">
         <div v-for="tool in availableTools" :key="tool" class="tool-item">

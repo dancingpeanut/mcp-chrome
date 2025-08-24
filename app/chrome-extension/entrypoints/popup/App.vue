@@ -2,7 +2,7 @@
   <div class="popup-container">
     <div class="header">
       <div class="header-content">
-        <h1 class="header-title">KM Server</h1>
+<!--        <h1 class="header-title">MCP Chrome Extension</h1>-->
       </div>
     </div>
     <div class="content">
