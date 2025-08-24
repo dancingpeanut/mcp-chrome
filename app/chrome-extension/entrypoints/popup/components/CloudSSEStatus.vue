@@ -53,7 +53,7 @@
       </div>
     </div>
 
-    <div class="actions">
+    <div v-if="false" class="actions">
       <button @click="syncTools" class="btn btn-info">
         Sync Tools
       </button>
