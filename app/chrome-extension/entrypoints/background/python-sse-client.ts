@@ -127,6 +127,9 @@ class PythonSSEClient {
    * Handle SSE messages from Python server
    */
   private handleSSEMessage(event: MessageEvent): void {
+    if (event.data === 'heartbeat') {
+      return
+    }
     try {
       const message: SSEMessage = JSON.parse(event.data);
       console.log('📨 PythonSSEClient: Received SSE message:', message);

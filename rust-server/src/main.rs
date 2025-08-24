@@ -30,6 +30,7 @@ use tower_http::cors::CorsLayer;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 use crate::common::{ApiResponse, ChromeResponsePayload, ClientExtension, OpPayload, PendingRequest, SseMessage, ToolCallPayload};
+use crate::proxy::ProxyState;
 
 // Constants
 const MESSAGE_TYPE_CONNECTED: &str = "connected";
@@ -591,14 +592,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let state = AppState::new();
+    let proxy_state = ProxyState::new();
 
     let app = Router::new()
-        .route("/_sse", get(sse_handler))
-        .route("/api/chrome/response", post(chrome_response_handler))
-        .route("/api/tool/list", get(list_tools_handler))
-        .route("/api/tool/call", get(call_tool_handler))
-        .layer(CorsLayer::permissive())
-        .with_state(state);
+        // .route("/api/chrome/response", post(chrome_response_handler))
+        // .route("/api/tool/list", get(list_tools_handler))
+        // .route("/api/tool/call", get(call_tool_handler))
+        // .layer(CorsLayer::permissive())
+        // .with_state(state)
+        .route("/_sse", get(handler::sse_handler))
+        .with_state(proxy_state);
 
     let addr = "0.0.0.0:12306";
     info!("Starting server on {}", addr);

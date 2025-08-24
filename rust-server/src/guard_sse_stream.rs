@@ -6,7 +6,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use futures_util::Stream;
 use tokio::sync::mpsc;
-use tokio::time::Interval;
+use tokio::time::{interval, Interval};
 
 #[derive(Clone, Debug)]
 pub struct SseStats {
@@ -72,14 +72,14 @@ pub struct GuardedSseStream<T: GuardListener> {
 }
 
 impl<T: GuardListener> GuardedSseStream<T> {
-    fn new(
+    pub(crate) fn new(
         rx: mpsc::UnboundedReceiver<String>,
         listener: T,
-        heartbeat_interval: Option<Interval>,
+        heartbeat_interval: Option<Duration>,
     ) -> Self {
         Self {
             rx,
-            heartbeat_interval,
+            heartbeat_interval: heartbeat_interval.map(|d| interval(d)),
             _guard: SseConnectionGuard::new(listener),
         }
     }
@@ -109,7 +109,8 @@ impl<T: GuardListener> Stream for GuardedSseStream<T> {
         if let Some(heartbeat_interval) = &mut self.heartbeat_interval {
             if let Poll::Ready(_) = heartbeat_interval.poll_tick(cx) {
                 let message = "heartbeat";
-                self._guard.track_message(message.len());
+                // 心态包不计入消息统计
+                // self._guard.track_message(message.len());
                 return Poll::Ready(Some(Ok(
                     axum::response::sse::Event::default().data(message)
                 )));
