@@ -177,10 +177,7 @@ class PythonSSEClient {
    */
   private async getToolsResponse(): Promise<any> {
     console.log(TOOL_SCHEMAS);
-    return {
-      success: true,
-      data: TOOL_SCHEMAS
-    };
+    return TOOL_SCHEMAS;
   }
 
   /**

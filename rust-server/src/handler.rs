@@ -5,7 +5,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use axum::response::{IntoResponse, Sse};
 use futures_util::Stream;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 use serde_json::Value;
 use tracing::{error, warn};
 use crate::{ClientQuery};

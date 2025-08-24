@@ -108,7 +108,13 @@ impl ProxyState {
         let message = SseMessage::from_message_type(MessageType::GetTools);
 
         let response = self.request_client(client, message, 30).await?;
-        println!("response: {:?}", response);
+        if response.success {
+            if let Some(data) = response.data {
+                let tools = data.as_array().cloned()
+                    .ok_or_else(|| anyhow!("Invalid response format"))?;
+                return Ok(tools);
+            }
+        }
 
         Err(anyhow!("Failed to get tools from client"))
     }
