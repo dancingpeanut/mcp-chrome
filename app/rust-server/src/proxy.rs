@@ -136,7 +136,7 @@ impl ProxyState {
         }
     }
 
-    pub async fn call_tool(&self, client_id: &str, tool_name: &str, args: Value) -> Result<Value> {
+    pub async fn call_tool(&self, client_id: &str, tool_name: &str, args: Option<Value>) -> Result<Value> {
         tracing::info!(
             "Calling tool,\n  client_id: {}\n  tool_name: {}\n  Arguments: {}",
             client_id,

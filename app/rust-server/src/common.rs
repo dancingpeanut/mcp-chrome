@@ -59,7 +59,7 @@ impl <T> ApiResponse<T> {
 pub enum MessageType {
     Connected,
     GetTools,
-    CallTool(String, Value),
+    CallTool(String, Option<Value>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

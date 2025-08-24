@@ -4,6 +4,7 @@ use rmcp::model::{CallToolRequestParam, CallToolResult, ErrorCode, Implementatio
 use rmcp::{ErrorData, RoleServer, ServerHandler};
 use rmcp::service::RequestContext;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use crate::proxy::ProxyState;
 
 #[derive(Clone)]
@@ -34,18 +35,22 @@ impl ServerHandler for ChromeExtensionServer {
         request: CallToolRequestParam,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
+        let client_id = self.get_client_id(&context)?.to_owned();
         let tcc = ToolCallContext::new(self, request, context);
-        // self.tool_router.call(tcc).await
-        println!("call tool: {}, {:?}", tcc.name, tcc.arguments);
-        Err(ErrorData::new(ErrorCode(1), "test".to_string(), None))
+        let args = tcc.arguments.clone().map(|a| {
+            serde_json::from_str::<Value>(&serde_json::to_string(&a).unwrap()).unwrap()
+        });
+        let result = self.state.call_tool(&client_id, &tcc.name, args).await
+            .map_err(|e| ErrorData::new(ErrorCode::INTERNAL_ERROR, e.to_string(), None))?;
+        Ok(CallToolResult::structured(result))
     }
 
     async fn list_tools(
         &self,
         _request: Option<PaginatedRequestParam>,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
-        let client_id = self.get_client_id(&_context)?;
+        let client_id = self.get_client_id(&context)?;
         let tools = self.state.get_tools(client_id).await
             .map_err(|e| ErrorData::new(ErrorCode::INTERNAL_ERROR, e.to_string(), None))?;
 

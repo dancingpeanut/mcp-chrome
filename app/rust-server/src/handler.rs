@@ -88,7 +88,7 @@ pub(crate) async fn call_tool(
     tool_args.insert("url".to_string(), Value::String("https://www.baidu.com/".to_string()));
     tool_args.insert("newWindow".to_string(), Value::Bool(false));
 
-    let result = state.call_tool(&params.client_id, tool_name, Value::from(tool_args)).await;
+    let result = state.call_tool(&params.client_id, tool_name, Some(Value::from(tool_args))).await;
     match result {
         Ok(result) => (
             StatusCode::OK,
