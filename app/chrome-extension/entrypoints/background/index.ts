@@ -4,7 +4,7 @@ import {
   initializeSemanticEngineIfCached,
 } from './semantic-similarity';
 import { initStorageManagerListener } from './storage-manager';
-import { initCloudSSEClient } from './python-sse-client';
+import { initCloudSSEClient } from './cloud-sse-client';
 import { cleanupModelCache } from '@/utils/semantic-similarity-engine';
 
 /**

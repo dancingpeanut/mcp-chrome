@@ -9,6 +9,9 @@ import { handleCallTool } from './tools';
 import { ICONS, NOTIFICATIONS, STORAGE_KEYS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/common/constants';
 import { v4 as uuidv4 } from 'uuid';
 
+// 默认服务器URL
+const DEFAULT_SERVER_URL = 'http://127.0.0.1:12306';
+
 // 获取或生成唯一client_id
 function getOrCreateClientId(): Promise<string> {
   return new Promise((resolve) => {
@@ -41,12 +44,80 @@ class CloudSSEClient {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
-  private serverUrl = 'http://127.0.0.1:12306';
+  private serverUrl = DEFAULT_SERVER_URL;
   private tools: Map<string, any> = new Map();
   private clientId: string | null = null;
 
   constructor() {
     this.initializeTools();
+    this.loadServerUrlFromStorage();
+  }
+
+  /**
+   * 从存储中加载服务器URL
+   */
+  private async loadServerUrlFromStorage(): Promise<void> {
+    try {
+      const result = await chrome.storage.local.get([STORAGE_KEYS.PYTHON_SSE_SERVER_URL]);
+      if (result[STORAGE_KEYS.PYTHON_SSE_SERVER_URL]) {
+        this.serverUrl = result[STORAGE_KEYS.PYTHON_SSE_SERVER_URL];
+        console.log(`CloudSSEClient: Loaded server URL from storage: ${this.serverUrl}`);
+      }
+    } catch (error) {
+      console.warn('CloudSSEClient: Failed to load server URL from storage, using default:', error);
+    }
+  }
+
+  /**
+   * 更新服务器URL
+   */
+  async updateServerUrl(newUrl: string): Promise<boolean> {
+    try {
+      // 验证URL格式
+      const url = new URL(newUrl);
+      if (!url.protocol || !url.hostname) {
+        throw new Error('Invalid URL format');
+      }
+
+      // 保存到存储
+      await chrome.storage.local.set({ [STORAGE_KEYS.PYTHON_SSE_SERVER_URL]: newUrl });
+      
+      // 更新内存中的URL
+      this.serverUrl = newUrl;
+      
+      console.log(`CloudSSEClient: Server URL updated to: ${newUrl}`);
+      
+      // 注意：现在只允许在断开状态下更新，所以不需要重新连接逻辑
+      
+      return true;
+    } catch (error) {
+      console.error('CloudSSEClient: Failed to update server URL:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 获取当前服务器URL
+   */
+  getServerUrl(): string {
+    return this.serverUrl;
+  }
+
+  /**
+   * 获取MCP地址
+   */
+  getMCPUrl(): string {
+    if (!this.clientId) {
+      throw new Error('Client ID not available');
+    }
+    return `${this.serverUrl}/${this.clientId}/mcp`;
+  }
+
+  /**
+   * 获取客户端ID
+   */
+  getClientId(): string | null {
+    return this.clientId;
   }
 
   private initializeTools() {
@@ -326,12 +397,25 @@ class CloudSSEClient {
    * Broadcast connection status to other parts of the extension
    */
   private broadcastConnectionStatus(connected: boolean): void {
+    const payload: any = {
+      connected,
+      timestamp: Date.now()
+    };
+
+    // 如果已连接，添加MCP地址
+    if (connected && this.clientId) {
+      try {
+        payload.mcpUrl = this.getMCPUrl();
+        payload.serverUrl = this.serverUrl;
+        payload.clientId = this.clientId;
+      } catch (error) {
+        console.warn('CloudSSEClient: Failed to get MCP URL:', error);
+      }
+    }
+
     chrome.runtime.sendMessage({
       type: BACKGROUND_MESSAGE_TYPES.PYTHON_SSE_STATUS_CHANGED,
-      payload: {
-        connected,
-        timestamp: Date.now()
-      }
+      payload
     }).catch(() => {
       // Ignore errors if no listeners are present
     });
@@ -375,6 +459,8 @@ export const initCloudSSEClient = () => {
     if (message.type === 'CONNECT_PYTHON_SSE') {
       pythonSSEClient.connect().then((success) => {
         sendResponse({ success });
+      }).catch((error) => {
+        sendResponse({ success: false, error: error.message || 'Failed to connect' });
       });
       return true;
     }
@@ -397,6 +483,8 @@ export const initCloudSSEClient = () => {
       const { type, payload } = message;
       pythonSSEClient.sendMessageToCloud(type, payload).then((success) => {
         sendResponse({ success });
+      }).catch((error) => {
+        sendResponse({ success: false, error: error.message || 'Failed to send message' });
       });
       return true;
     }
@@ -406,6 +494,43 @@ export const initCloudSSEClient = () => {
         success: true,
         tools: pythonSSEClient.getAvailableTools()
       });
+      return true;
+    }
+
+    if (message.type === BACKGROUND_MESSAGE_TYPES.GET_PYTHON_SSE_CONFIG) {
+      sendResponse({
+        success: true,
+        config: {
+          serverUrl: pythonSSEClient.getServerUrl(),
+          clientId: pythonSSEClient.getClientId(),
+          mcpUrl: pythonSSEClient.getClientId() ? pythonSSEClient.getMCPUrl() : null,
+          isConnected: pythonSSEClient.getConnectionStatus()
+        }
+      });
+      return true;
+    }
+
+    if (message.type === BACKGROUND_MESSAGE_TYPES.UPDATE_PYTHON_SSE_CONFIG) {
+      const { serverUrl } = message;
+      
+      // 检查是否已连接，如果已连接则不允许更新
+      if (pythonSSEClient.getConnectionStatus()) {
+        sendResponse({ 
+          success: false, 
+          error: 'Cannot update server URL while connected. Please disconnect first.' 
+        });
+        return true;
+      }
+      
+      if (serverUrl) {
+        pythonSSEClient.updateServerUrl(serverUrl).then((success) => {
+          sendResponse({ success });
+        }).catch((error) => {
+          sendResponse({ success: false, error: error.message || 'Failed to update server URL' });
+        });
+      } else {
+        sendResponse({ success: false, error: 'Server URL is required' });
+      }
       return true;
     }
   });

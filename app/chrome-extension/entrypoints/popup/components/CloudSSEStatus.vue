@@ -37,15 +37,50 @@
       </div>
     </div>
 
+          <div class="server-config">
+        <h4>Server Configuration</h4>
+        <div class="config-item">
+          <label for="serverUrl" class="config-label">Server URL:</label>
+          <div class="config-input-group">
+            <input
+              id="serverUrl"
+              v-model="serverUrlInput"
+              type="text"
+              placeholder="http://127.0.0.1:12306"
+              class="config-input"
+              :disabled="isConnected"
+            />
+            <button 
+              @click="updateServerUrl" 
+              class="btn btn-info" 
+              :disabled="!serverUrlInput.trim() || isConnected"
+              :title="isConnected ? 'Please disconnect first to update server URL' : 'Update server URL'"
+            >
+              Update
+            </button>
+          </div>
+          <div v-if="isConnected" class="config-note">
+            ⚠️ Please disconnect first to update server URL
+          </div>
+        </div>
+      </div>
+
     <div class="server-info">
       <h4>Server Information</h4>
       <div class="info-item">
-        <span class="label">URL:</span>
-        <span class="value">{{ serverUrl }}</span>
+        <span class="label">Current URL:</span>
+        <span class="value">{{ currentServerUrl }}</span>
       </div>
       <div class="info-item">
-        <span class="label">Port:</span>
-        <span class="value">{{ serverPort }}</span>
+        <span class="label">Client ID:</span>
+        <span class="value">{{ clientId || 'Not available' }}</span>
+      </div>
+      <div class="info-item">
+        <span class="label">MCP Address:</span>
+        <span class="value mcp-url">{{ mcpUrl || 'Not available' }}</span>
+        <button v-if="mcpUrl" @click="copyMcpUrl" class="copy-btn" title="Copy MCP URL">
+          📋
+        </button>
       </div>
       <div class="info-item">
         <span class="label">Last Updated:</span>
@@ -70,8 +105,10 @@ import { ref, onMounted, onUnmounted } from 'vue';
 // Reactive state
 const isConnected = ref(false);
 const availableTools = ref<string[]>([]);
-const serverUrl = ref('127.0.0.1');
-const serverPort = ref(12306);
+const serverUrlInput = ref('http://127.0.0.1:12306');
+const currentServerUrl = ref('http://127.0.0.1:12306');
+const clientId = ref<string | null>(null);
+const mcpUrl = ref<string | null>(null);
 const lastUpdated = ref('Never');
 
 // Message listener cleanup
@@ -133,14 +170,52 @@ const pingServer = async () => {
   }
 };
 
+const updateServerUrl = async () => {
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'update_python_sse_config',
+      serverUrl: serverUrlInput.value.trim()
+    });
+    if (response && response.success) {
+      console.log('Server URL updated successfully');
+      await updateStatus();
+    } else {
+      console.error('Failed to update server URL:', response?.error || 'Unknown error');
+    }
+  } catch (error) {
+    console.error('Error updating server URL:', error);
+  }
+};
+
+const copyMcpUrl = async () => {
+  if (mcpUrl.value) {
+    try {
+      await navigator.clipboard.writeText(mcpUrl.value);
+      console.log('MCP URL copied to clipboard');
+    } catch (error) {
+      console.error('Failed to copy MCP URL:', error);
+    }
+  }
+};
+
 const updateStatus = async () => {
   try {
-    const response = await chrome.runtime.sendMessage({ type: 'GET_PYTHON_SSE_STATUS' });
-    if (response.success) {
-      isConnected.value = response.connected;
-      if (response.connected) {
+    // 获取连接状态
+    const statusResponse = await chrome.runtime.sendMessage({ type: 'GET_PYTHON_SSE_STATUS' });
+    if (statusResponse.success) {
+      isConnected.value = statusResponse.connected;
+      if (statusResponse.connected) {
         await syncTools();
       }
+    }
+
+    // 获取配置信息
+    const configResponse = await chrome.runtime.sendMessage({ type: 'get_python_sse_config' });
+    if (configResponse && configResponse.success) {
+      currentServerUrl.value = configResponse.config.serverUrl;
+      clientId.value = configResponse.config.clientId;
+      mcpUrl.value = configResponse.config.mcpUrl;
+      serverUrlInput.value = configResponse.config.serverUrl;
     }
   } catch (error) {
     console.error('Error getting status:', error);
@@ -154,6 +229,16 @@ const setupMessageListener = () => {
       isConnected.value = message.payload.connected;
       if (message.payload.connected) {
         syncTools();
+        // 更新MCP地址和客户端ID
+        if (message.payload.mcpUrl) {
+          mcpUrl.value = message.payload.mcpUrl;
+          clientId.value = message.payload.clientId;
+          currentServerUrl.value = message.payload.serverUrl;
+        }
+      } else {
+        // 断开连接时清空MCP地址
+        mcpUrl.value = null;
+        clientId.value = null;
       }
     }
   };
@@ -337,5 +422,88 @@ onUnmounted(() => {
 .actions {
   display: flex;
   gap: 8px;
+}
+
+.server-config {
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
+.server-config h4 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.config-item {
+  margin-bottom: 8px;
+}
+
+.config-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+}
+
+.config-input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.config-input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.mcp-url {
+  font-family: monospace;
+  word-break: break-all;
+  max-width: 200px;
+}
+
+.copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 2px;
+  transition: background-color 0.2s;
+}
+
+.copy-btn:hover {
+  background-color: #f0f0f0;
+}
+
+.config-note {
+  margin-top: 8px;
+  padding: 8px;
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #856404;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.config-input:disabled {
+  background-color: #f5f5f5;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

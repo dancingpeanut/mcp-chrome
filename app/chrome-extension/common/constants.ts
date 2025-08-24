@@ -102,6 +102,7 @@ export const STORAGE_KEYS = {
   SEMANTIC_MODEL: 'selectedModel',
   USER_PREFERENCES: 'userPreferences',
   VECTOR_INDEX: 'vectorIndex',
+  PYTHON_SSE_SERVER_URL: 'python_sse_server_url',
 } as const;
 
 // Notification Configuration
