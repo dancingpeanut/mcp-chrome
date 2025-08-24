@@ -4,8 +4,8 @@ mod handler;
 mod common;
 mod mcp;
 
-use axum::{middleware, routing::{get, post}, Extension, Router};
-use axum::extract::{NestedPath, Path, Request};
+use axum::{middleware, routing::{get, post}, Router};
+use axum::extract::{Path, Request};
 use axum::middleware::Next;
 use axum::response::IntoResponse;
 use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
@@ -15,16 +15,9 @@ use tracing_subscriber::util::SubscriberInitExt;
 use crate::mcp::ChromeExtensionServer;
 use crate::proxy::ProxyState;
 
-async fn sse_entry(Path(client_id): Path<String>, mut req: Request, next: Next) -> impl IntoResponse {
-    tracing::info!("Received SSE request: {:?}", req.uri().path_and_query());
-    tracing::info!("Client ID: {:?}", client_id);
-    // let r =  Request::builder()
-    //     .method("GET")
-    //     .uri("http://127.0.0.1/api/v1/crates")
-    //     .body(Body::empty()).unwrap();
-    //
-    // let np = NestedPath::from_request(r, &()).await.unwrap();
-    // tracing::info!("Nested path: {:?}", np);
+async fn inject_client_id(Path(client_id): Path<String>, mut req: Request, next: Next) -> impl IntoResponse {
+    tracing::info!("MCP request, client_id: {}", client_id);
+    req.headers_mut().insert("client_id", client_id.parse().unwrap());
     next.run(req).await
 }
 
@@ -35,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "debug".to_string().into()),
+                .unwrap_or_else(|_| "info".to_string().into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -48,7 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Default::default(),
     );
     let mcp_router = Router::new().nest_service("/{client_id}/mcp", mcp_service)
-        .layer(middleware::from_fn(sse_entry));
+        .layer(middleware::from_fn(inject_client_id));
 
     let router = Router::new()
         .route("/_sse", get(handler::sse))
