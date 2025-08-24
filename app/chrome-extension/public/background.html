@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chrome Extension Background</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            overflow: hidden;
+            width: 0;
+            height: 0;
+        }
+        /* 隐藏页面内容，只作为后台脚本容器 */
+        .background-container {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="background-container">
+        <!-- 这个页面只用于保持后台脚本运行，内容不可见 -->
+        <div id="status">Background script running...</div>
+    </div>
+    
+    <!-- 加载后台脚本 -->
+    <script type="module" src="/entrypoints/background/index.ts"></script>
+    
+    <!-- 保持页面活跃的脚本 -->
+    <script>
+        // 保持页面活跃，防止被Chrome回收
+        let keepAliveInterval;
+        let storageKeepAliveInterval;
+        let alarmKeepAliveInterval;
+        let pageActivityInterval;
+        
+        function startKeepAlive() {
+            // 1. 主要保活机制 - 每20秒发送一次心跳
+            keepAliveInterval = setInterval(() => {
+                // 发送消息到扩展的其他部分，保持连接
+                if (chrome && chrome.runtime) {
+                    chrome.runtime.sendMessage({
+                        type: 'BACKGROUND_KEEP_ALIVE',
+                        timestamp: Date.now()
+                    }).catch(() => {
+                        // 忽略错误，这只是保持活跃的机制
+                    });
+                }
+                
+                // 更新页面状态（虽然不可见）
+                const statusElement = document.getElementById('status');
+                if (statusElement) {
+                    statusElement.textContent = `Background script running... ${new Date().toLocaleTimeString()}`;
+                }
+            }, 20000); // 20秒间隔，确保在30秒超时前发送心跳
+            
+            // 2. 存储保活 - 每15秒写入一次存储
+            storageKeepAliveInterval = setInterval(() => {
+                if (chrome && chrome.storage) {
+                    chrome.storage.local.set({
+                        background_page_keep_alive: {
+                            timestamp: Date.now(),
+                            page: 'background.html',
+                            status: 'active'
+                        }
+                    }, () => {
+                        console.log('Background: Storage keep-alive performed');
+                    });
+                }
+            }, 15000);
+            
+            // 3. 闹钟保活 - 每18秒设置一次闹钟
+            alarmKeepAliveInterval = setInterval(() => {
+                if (chrome && chrome.alarms) {
+                    const alarmName = `background_page_keep_alive_${Date.now()}`;
+                    chrome.alarms.create(alarmName, {
+                        delayInMinutes: 0.05 // 3秒后触发
+                    });
+                    
+                    // 立即清除闹钟，这只是为了保持活跃
+                    setTimeout(() => {
+                        chrome.alarms.clear(alarmName).catch(() => {
+                            // 忽略清除失败
+                        });
+                    }, 1000);
+                }
+            }, 18000);
+            
+            // 4. 页面活动保活 - 每10秒执行一次页面活动
+            pageActivityInterval = setInterval(() => {
+                // 模拟页面活动
+                const event = new Event('keepalive');
+                document.dispatchEvent(event);
+                
+                // 更新DOM保持活跃
+                const timestamp = document.createElement('div');
+                timestamp.textContent = `Last activity: ${new Date().toLocaleTimeString()}`;
+                timestamp.style.display = 'none';
+                document.body.appendChild(timestamp);
+                
+                // 立即移除
+                setTimeout(() => {
+                    if (timestamp.parentNode) {
+                        timestamp.parentNode.removeChild(timestamp);
+                    }
+                }, 100);
+                
+                console.log('Background: Page activity keep-alive performed');
+            }, 10000);
+            
+            console.log('Background: Enhanced keep-alive mechanism started');
+        }
+        
+        // 页面加载完成后启动保活机制
+        document.addEventListener('DOMContentLoaded', () => {
+            startKeepAlive();
+            console.log('Background page loaded and enhanced keep-alive started');
+        });
+        
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', () => {
+            if (keepAliveInterval) {
+                clearInterval(keepAliveInterval);
+            }
+            if (storageKeepAliveInterval) {
+                clearInterval(storageKeepAliveInterval);
+            }
+            if (alarmKeepAliveInterval) {
+                clearInterval(alarmKeepAliveInterval);
+            }
+            if (pageActivityInterval) {
+                clearInterval(pageActivityInterval);
+            }
+            console.log('Background: All keep-alive mechanisms stopped');
+        });
+        
+        // 处理页面可见性变化
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                console.log('Background page became hidden');
+            } else {
+                console.log('Background page became visible');
+            }
+        });
+        
+        // 处理保活事件
+        document.addEventListener('keepalive', () => {
+            console.log('Background: Keep-alive event received');
+        });
+        
+        // 额外的保活策略：监听各种事件
+        document.addEventListener('focus', () => console.log('Background: Page focused'));
+        document.addEventListener('blur', () => console.log('Background: Page blurred'));
+        document.addEventListener('resize', () => console.log('Background: Page resized'));
+        
+        // 定期检查Chrome API可用性
+        setInterval(() => {
+            if (chrome && chrome.runtime && chrome.runtime.id) {
+                console.log('Background: Chrome APIs available');
+            } else {
+                console.warn('Background: Chrome APIs not available');
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

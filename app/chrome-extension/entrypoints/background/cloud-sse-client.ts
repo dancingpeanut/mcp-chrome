@@ -47,10 +47,174 @@ class CloudSSEClient {
   private serverUrl = DEFAULT_SERVER_URL;
   private tools: Map<string, any> = new Map();
   private clientId: string | null = null;
+  
+  // 连接保活机制
+  private keepAliveTimer: NodeJS.Timeout | null = null;
+  private connectionHealthTimer: NodeJS.Timeout | null = null;
+  private lastActivityTime: number = Date.now();
+  private keepAliveInterval: number = 15000; // 15秒保活间隔，更频繁
+  private healthCheckInterval: number = 30000; // 30秒健康检查间隔
+  
+  // Chrome扩展保活机制
+  private chromeKeepAliveTimer: NodeJS.Timeout | null = null;
+  private storageKeepAliveTimer: NodeJS.Timeout | null = null;
+  private alarmKeepAliveTimer: NodeJS.Timeout | null = null;
+  private chromeKeepAliveInterval: number = 10000; // 10秒Chrome保活间隔
 
   constructor() {
     this.initializeTools();
     this.loadServerUrlFromStorage();
+    this.startConnectionKeepAlive();
+  }
+
+  /**
+   * 启动连接保活机制
+   */
+  private startConnectionKeepAlive(): void {
+    // 启动连接健康检查
+    this.connectionHealthTimer = setInterval(() => {
+      this.checkConnectionHealth();
+    }, this.healthCheckInterval);
+
+    // 启动Chrome扩展保活机制
+    this.startChromeKeepAlive();
+
+    console.log('CloudSSEClient: Connection keep-alive mechanism started');
+  }
+
+  /**
+   * 启动Chrome扩展保活机制
+   */
+  private startChromeKeepAlive(): void {
+    // 1. 定时器保活 - 每10秒执行一次
+    this.chromeKeepAliveTimer = setInterval(() => {
+      this.performChromeKeepAlive();
+    }, this.chromeKeepAliveInterval);
+
+    // 2. 存储保活 - 每20秒写入一次存储
+    this.storageKeepAliveTimer = setInterval(() => {
+      this.performStorageKeepAlive();
+    }, 20000);
+
+    // 3. 闹钟保活 - 每25秒设置一次闹钟
+    this.alarmKeepAliveTimer = setInterval(() => {
+      this.performAlarmKeepAlive();
+    }, 25000);
+
+    console.log('CloudSSEClient: Chrome extension keep-alive mechanism started');
+  }
+
+  /**
+   * 执行Chrome扩展保活操作
+   */
+  private performChromeKeepAlive(): void {
+    try {
+      // 1. 发送内部保活消息
+      chrome.runtime.sendMessage({
+        type: 'INTERNAL_KEEP_ALIVE',
+        timestamp: Date.now(),
+        source: 'cloud_sse_client'
+      }).catch(() => {
+        // 忽略错误，这只是保活机制
+      });
+
+      // 2. 执行一些Chrome API调用保持活跃
+      chrome.storage.local.get(['keep_alive_timestamp'], (result) => {
+        // 读取存储保持活跃
+        const timestamp = result.keep_alive_timestamp || 0;
+        chrome.storage.local.set({ 
+          keep_alive_timestamp: Date.now(),
+          last_keep_alive: 'cloud_sse_client'
+        });
+      });
+
+      // 3. 检查扩展权限保持活跃
+      chrome.permissions.contains({
+        permissions: ['storage', 'tabs']
+      }, (hasPermissions) => {
+        // 权限检查保持活跃
+        if (hasPermissions) {
+          console.log('CloudSSEClient: Chrome keep-alive performed');
+        }
+      });
+
+    } catch (error) {
+      console.warn('CloudSSEClient: Chrome keep-alive failed:', error);
+    }
+  }
+
+  /**
+   * 执行存储保活操作
+   */
+  private performStorageKeepAlive(): void {
+    try {
+      const keepAliveData = {
+        timestamp: Date.now(),
+        clientId: this.clientId,
+        serverUrl: this.serverUrl,
+        isConnected: this.isConnected,
+        reconnectAttempts: this.reconnectAttempts
+      };
+
+      chrome.storage.local.set({ 
+        sse_client_keep_alive: keepAliveData,
+        last_storage_keep_alive: Date.now()
+      }, () => {
+        console.log('CloudSSEClient: Storage keep-alive performed');
+      });
+    } catch (error) {
+      console.warn('CloudSSEClient: Storage keep-alive failed:', error);
+    }
+  }
+
+  /**
+   * 执行闹钟保活操作
+   */
+  private performAlarmKeepAlive(): void {
+    try {
+      // 创建临时闹钟保持活跃
+      const alarmName = `sse_client_keep_alive_${Date.now()}`;
+      chrome.alarms.create(alarmName, {
+        delayInMinutes: 0.1 // 6秒后触发
+      });
+
+      // 立即清除闹钟，这只是为了保持活跃
+      setTimeout(() => {
+        chrome.alarms.clear(alarmName).catch(() => {
+          // 忽略清除失败
+        });
+      }, 1000);
+
+      console.log('CloudSSEClient: Alarm keep-alive performed');
+    } catch (error) {
+      console.warn('CloudSSEClient: Alarm keep-alive failed:', error);
+    }
+  }
+
+  /**
+   * 检查连接健康状态
+   */
+  private checkConnectionHealth(): void {
+    const now = Date.now();
+    const timeSinceLastActivity = now - this.lastActivityTime;
+    
+    // 如果超过健康检查间隔没有活动，认为连接有问题
+    if (this.isConnected && timeSinceLastActivity > this.healthCheckInterval) {
+      console.log('CloudSSEClient: Connection health check failed, no activity detected');
+      this.handleConnectionError();
+      return;
+    }
+
+    // 检查EventSource状态
+    if (this.isConnected && this.eventSource) {
+      if (this.eventSource.readyState === EventSource.CLOSED) {
+        console.log('CloudSSEClient: EventSource is closed, triggering reconnection');
+        this.handleConnectionError();
+        return;
+      }
+    }
+
+    console.log('CloudSSEClient: Connection health check passed');
   }
 
   /**
@@ -158,6 +322,7 @@ class CloudSSEClient {
         console.log('CloudSSEClient: SSE connection opened');
         this.isConnected = true;
         this.reconnectAttempts = 0;
+        this.lastActivityTime = Date.now(); // 更新活动时间
         this.broadcastConnectionStatus(true);
       };
       this.eventSource.onmessage = (event) => {
@@ -192,6 +357,9 @@ class CloudSSEClient {
    */
   private async handleSSEMessage(event: MessageEvent): Promise<void> {
     console.log('Received SSE message:', event.data);
+    // 更新最后活动时间
+    this.lastActivityTime = Date.now();
+    
     if (event.data === 'heartbeat') {
       return
     }
@@ -325,43 +493,6 @@ class CloudSSEClient {
   }
 
   /**
-   * Send message to Cloud server
-   */
-  async sendMessageToCloud(type: string, payload: any): Promise<boolean> {
-    try {
-      const messageData = {
-        type,
-        payload
-      };
-
-      console.log('📤 CloudSSEClient: Sending message to Cloud server:');
-      console.log('   Message Type:', type);
-      console.log('   Payload:', payload);
-      console.log('   Target URL:', `${this.serverUrl}/api/chrome/message`);
-
-      const response = await fetch(`${this.serverUrl}/api/chrome/message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(messageData)
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('✅ CloudSSEClient: Message sent successfully to Cloud server');
-      console.log('   Server response:', result);
-      return result.success;
-    } catch (error) {
-      console.error('❌ CloudSSEClient: Failed to send message to Cloud server:', error);
-      return false;
-    }
-  }
-
-  /**
    * Handle connection errors and attempt reconnection
    */
   private handleConnectionError(): void {
@@ -434,6 +565,36 @@ class CloudSSEClient {
   getAvailableTools(): string[] {
     return Array.from(this.tools.keys());
   }
+
+  /**
+   * 清理资源
+   */
+  cleanup(): void {
+    if (this.keepAliveTimer) {
+      clearInterval(this.keepAliveTimer);
+      this.keepAliveTimer = null;
+    }
+    if (this.connectionHealthTimer) {
+      clearInterval(this.connectionHealthTimer);
+      this.connectionHealthTimer = null;
+    }
+    if (this.chromeKeepAliveTimer) {
+      clearInterval(this.chromeKeepAliveTimer);
+      this.chromeKeepAliveTimer = null;
+    }
+    if (this.storageKeepAliveTimer) {
+      clearInterval(this.storageKeepAliveTimer);
+      this.storageKeepAliveTimer = null;
+    }
+    if (this.alarmKeepAliveTimer) {
+      clearInterval(this.alarmKeepAliveTimer);
+      this.alarmKeepAliveTimer = null;
+    }
+    if (this.eventSource) {
+      this.disconnect();
+    }
+    console.log('CloudSSEClient: Resources cleaned up');
+  }
 }
 
 // Create global instance
@@ -475,16 +636,6 @@ export const initCloudSSEClient = () => {
       sendResponse({
         success: true,
         connected: pythonSSEClient.getConnectionStatus()
-      });
-      return true;
-    }
-
-    if (message.type === 'SEND_MESSAGE_TO_PYTHON') {
-      const { type, payload } = message;
-      pythonSSEClient.sendMessageToCloud(type, payload).then((success) => {
-        sendResponse({ success });
-      }).catch((error) => {
-        sendResponse({ success: false, error: error.message || 'Failed to send message' });
       });
       return true;
     }

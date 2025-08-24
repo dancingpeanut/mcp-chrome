@@ -18,6 +18,34 @@ export default defineBackground(() => {
   initStorageManagerListener();
   initCloudSSEClient();
 
+  // 添加保活消息处理
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'BACKGROUND_KEEP_ALIVE') {
+      // 处理保活消息，保持后台脚本活跃
+      console.log('Background: Keep-alive message received:', message.timestamp);
+      sendResponse({ success: true, timestamp: Date.now() });
+      return true;
+    }
+    
+    if (message.type === 'INTERNAL_KEEP_ALIVE') {
+      // 处理内部保活消息
+      console.log('Background: Internal keep-alive from:', message.source, 'at:', message.timestamp);
+      sendResponse({ success: true, timestamp: Date.now() });
+      return true;
+    }
+  });
+
+  // 设置闹钟监听器保持活跃
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name.startsWith('sse_client_keep_alive_')) {
+      console.log('Background: Keep-alive alarm triggered:', alarm.name);
+      // 立即清除这个临时闹钟
+      chrome.alarms.clear(alarm.name).catch(() => {
+        // 忽略清除失败
+      });
+    }
+  });
+
   // Conditionally initialize semantic similarity engine if model cache exists
   initializeSemanticEngineIfCached()
     .then((initialized) => {

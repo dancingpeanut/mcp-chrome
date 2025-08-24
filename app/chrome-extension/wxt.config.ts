@@ -42,6 +42,8 @@ export default defineConfig({
       'bookmarks',
       'offscreen',
       'storage',
+      'background', // 添加后台权限
+      'alarms', // 添加闹钟权限用于保活
     ],
     host_permissions: ['<all_urls>'],
     web_accessible_resources: [
@@ -61,6 +63,11 @@ export default defineConfig({
     },
     content_security_policy: {
       extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
+    },
+    // 使用持久化后台页面而不是Service Worker
+    background: {
+      service_worker: false,
+      page: 'background.html'
     },
   },
   vite: (env) => ({

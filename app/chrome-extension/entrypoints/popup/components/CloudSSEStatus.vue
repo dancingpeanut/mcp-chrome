@@ -160,7 +160,6 @@ const syncTools = async () => {
 const pingServer = async () => {
   try {
     const response = await chrome.runtime.sendMessage({
-      type: 'SEND_MESSAGE_TO_PYTHON',
       type: 'ping',
       payload: { message: 'Hello from Chrome extension!' }
     });

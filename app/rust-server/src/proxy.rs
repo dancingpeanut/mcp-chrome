@@ -186,7 +186,6 @@ impl GuardListener for ClientListener {
             state.remove_client(&client_id).await;
             tracing::info!("SSE client {} cleaned up", client_id);
         });
-        println!("Extension client disconnected: {:?}", stats);
     }
 }
 
