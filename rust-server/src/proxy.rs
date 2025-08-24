@@ -7,7 +7,8 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::time::timeout;
 use tracing::{error, info, warn};
 use uuid::Uuid;
-use crate::{OpPayload, PendingRequest, SseMessage, ToolCallPayload, MESSAGE_TYPE_OP, OP_TYPE_CALL_TOOL, OP_TYPE_GET_TOOLS};
+use crate::{MESSAGE_TYPE_OP, OP_TYPE_CALL_TOOL, OP_TYPE_GET_TOOLS};
+use crate::common::{OpPayload, PendingRequest, SseMessage, ToolCallPayload};
 
 #[derive(Debug, Clone)]
 struct ExtensionClient {

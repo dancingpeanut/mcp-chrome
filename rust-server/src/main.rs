@@ -1,5 +1,7 @@
 mod proxy;
 mod guard_sse_stream;
+mod handler;
+mod common;
 
 use axum::{
     extract::{Query, State},
@@ -27,6 +29,7 @@ use tokio::{
 use tower_http::cors::CorsLayer;
 use tracing::{error, info, warn};
 use uuid::Uuid;
+use crate::common::{ApiResponse, ChromeResponsePayload, ClientExtension, OpPayload, PendingRequest, SseMessage, ToolCallPayload};
 
 // Constants
 const MESSAGE_TYPE_CONNECTED: &str = "connected";
@@ -36,62 +39,7 @@ const MESSAGE_TYPE_OP: &str = "op";
 const OP_TYPE_GET_TOOLS: &str = "get_tools";
 const OP_TYPE_CALL_TOOL: &str = "call_tool";
 
-// Data structures
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ApiResponse<T> {
-    success: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<T>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<String>,
-}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct SseMessage {
-    #[serde(rename = "type")]
-    message_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    payload: Option<Value>,
-    timestamp: DateTime<Utc>,
-    #[serde(rename = "requestId", skip_serializing_if = "Option::is_none")]
-    request_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    message: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    client_id: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ChromeResponsePayload {
-    #[serde(rename = "requestId")]
-    request_id: String,
-    response: Value,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct OpPayload {
-    #[serde(rename = "type")]
-    op_type: String,
-    payload: Value,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ToolCallPayload {
-    name: String,
-    args: Value,
-}
-
-#[derive(Debug, Clone)]
-struct ClientExtension {
-    client_id: String,
-    sender: mpsc::UnboundedSender<String>,
-    tools: Arc<tokio::sync::RwLock<Option<Vec<Value>>>>,
-}
-
-#[derive(Debug)]
-struct PendingRequest {
-    sender: oneshot::Sender<Value>,
-}
 
 #[derive(Clone)]
 struct AppState {
