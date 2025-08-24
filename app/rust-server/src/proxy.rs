@@ -131,13 +131,10 @@ impl ProxyState {
 
         let tools = self.get_tools_from_client(&client).await?;
         {
-            let tools_guard = client.tools.write().await;
-            if let Some(ref tools) = *tools_guard {
-                return Ok(tools.clone())
-            }
+            let mut tools_guard = client.tools.write().await;
+            *tools_guard = Some(tools.clone());
+            Ok(tools.clone())
         }
-
-        Ok(tools)
     }
 
     pub async fn call_tool(&self, client_id: &str, tool_name: &str, args: Value) -> Result<Value> {
