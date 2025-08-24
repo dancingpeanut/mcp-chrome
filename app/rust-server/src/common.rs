@@ -1,9 +1,8 @@
-use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
+
 // Data structures
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,7 +16,7 @@ pub struct ApiResponse<T> {
 }
 
 impl <T> ApiResponse<T> {
-    
+
     pub fn new() -> Self {
         Self {
             request_id: Some(Uuid::new_v4().to_string()),
@@ -26,7 +25,7 @@ impl <T> ApiResponse<T> {
             error: None,
         }
     }
-    
+
     pub fn new_with_request_id(request_id: String) -> Self {
         Self {
             request_id: Some(request_id),
@@ -35,7 +34,7 @@ impl <T> ApiResponse<T> {
             error: None,
         }
     }
-    
+
     pub fn with_success(mut self, data: T) -> Self {
         self.success = true;
         self.data = Some(data);
@@ -47,23 +46,14 @@ impl <T> ApiResponse<T> {
         self.error = Some(error);
         self
     }
-    
+
     pub fn success(data: T) -> Self {
         Self::new().with_success(data)
     }
-    
+
     pub fn error(error: String) -> Self {
         Self::new().with_error(error)
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApiResponseold<T> {
-    pub(crate) success: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) data: Option<T>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,34 +71,3 @@ pub struct SseMessage {
     pub(crate) client_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChromeResponsePayload {
-    #[serde(rename = "requestId")]
-    pub(crate) request_id: String,
-    pub(crate) response: Value,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OpPayload {
-    #[serde(rename = "type")]
-    pub(crate) op_type: String,
-    pub(crate) payload: Value,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolCallPayload {
-    pub(crate) name: String,
-    pub(crate) args: Value,
-}
-
-#[derive(Debug, Clone)]
-pub struct ClientExtension {
-    pub(crate) client_id: String,
-    pub(crate) sender: mpsc::UnboundedSender<String>,
-    pub(crate) tools: Arc<tokio::sync::RwLock<Option<Vec<Value>>>>,
-}
-
-#[derive(Debug)]
-pub struct PendingRequest {
-    pub(crate) sender: oneshot::Sender<Value>,
-}

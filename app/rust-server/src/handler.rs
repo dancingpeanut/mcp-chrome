@@ -8,17 +8,16 @@ use futures_util::Stream;
 use serde::{Deserialize};
 use serde_json::Value;
 use tracing::{error, warn};
-use crate::{AppState, ClientQuery};
-use crate::common::{ApiResponse, ApiResponseold};
+use crate::common::ApiResponse;
 use crate::proxy::{MessageType, ProxyState, SseMessage};
 
 #[derive(Deserialize)]
-pub struct SseQuery {
+pub struct ClientQuery {
     pub client_id: String,
 }
 
 pub async fn sse(
-    Query(params): Query<SseQuery>,
+    Query(params): Query<ClientQuery>,
     State(state): State<ProxyState>,
 ) -> Sse<impl Stream<Item = Result<axum::response::sse::Event, Infallible>>> {
     let (client, stream) = state.connect_to_client(params.client_id.clone()).await;
