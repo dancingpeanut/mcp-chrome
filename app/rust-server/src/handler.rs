@@ -8,8 +8,8 @@ use futures_util::Stream;
 use serde::{Deserialize};
 use serde_json::Value;
 use tracing::{error, warn};
-use crate::common::ApiResponse;
-use crate::proxy::{MessageType, ProxyState, SseMessage};
+use crate::common::{ApiResponse, MessageType, SseMessage};
+use crate::proxy::ProxyState;
 
 #[derive(Deserialize)]
 pub struct ClientQuery {

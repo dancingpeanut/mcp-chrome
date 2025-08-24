@@ -1,15 +1,12 @@
 use anyhow::{anyhow, Result};
 use std::sync::Arc;
 use std::time::Duration;
-use chrono::{DateTime, Utc};
 use dashmap::DashMap;
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::timeout;
 use tracing::{error, info, warn};
-use uuid::Uuid;
-use crate::common::{ApiResponse};
+use crate::common::{ApiResponse, MessageType, SseMessage};
 use crate::guard_sse_stream::{GuardListener, GuardedSseStream, SseStats};
 
 #[derive(Clone)]
@@ -167,16 +164,16 @@ impl ProxyState {
     }
 }
 
-pub struct ClientListener {
-    client_id: String,
-    state: ProxyState,
-}
-
 #[derive(Debug, Clone)]
 pub struct ExtensionClient {
     pub client_id: String,
     pub sender: mpsc::UnboundedSender<String>,
     pub tools: Arc<tokio::sync::RwLock<Option<Vec<Value>>>>,
+}
+
+pub struct ClientListener {
+    client_id: String,
+    state: ProxyState,
 }
 
 impl GuardListener for ClientListener {
@@ -194,50 +191,6 @@ impl GuardListener for ClientListener {
             info!("SSE client {} cleaned up", client_id);
         });
         println!("Client disconnected: {:?}", stats);
-    }
-}
-
-pub enum MessageType {
-    Connected,
-    GetTools,
-    CallTool(String, Value),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SseMessage {
-    message_type: String,
-    payload: Option<Value>,
-    timestamp: DateTime<Utc>,
-    request_id: String,
-}
-
-impl SseMessage {
-    pub fn from_message_type(message_type: MessageType) -> Self {
-        let request_id = Uuid::new_v4().to_string();
-        let timestamp = Utc::now();
-        match message_type {
-            MessageType::Connected => Self {
-                message_type: "connected".to_string(),
-                payload: None,
-                timestamp,
-                request_id,
-            },
-            MessageType::GetTools => Self {
-                message_type: "get_tools".to_string(),
-                payload: None,
-                timestamp,
-                request_id,
-            },
-            MessageType::CallTool(name, args) => Self {
-                message_type: "call_tool".to_string(),
-                payload: Some(json!({
-                    "name": name,
-                    "args": args
-                })),
-                timestamp,
-                request_id,
-            },
-        }
     }
 }
 
