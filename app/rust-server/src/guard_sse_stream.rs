@@ -10,9 +10,9 @@ use tokio::time::{interval, Interval};
 
 #[derive(Clone, Debug)]
 pub struct SseStats {
-    duration: Duration,
-    bytes_sent: u64,
-    messages_sent: u64,
+    pub duration: Duration,
+    pub bytes_sent: u64,
+    pub messages_sent: u64,
 }
 
 pub trait GuardListener {

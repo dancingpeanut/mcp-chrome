@@ -181,6 +181,18 @@ pub struct ExtensionClient {
 
 impl GuardListener for ClientListener {
     fn close(&self, stats: SseStats) {
+        info!(
+            "StreamGuard dropped for client: {} (bytes sent: {}, messages sent: {}, duration: {:?})",
+            self.client_id, stats.bytes_sent, stats.messages_sent, stats.duration
+        );
+
+        let state = self.state.clone();
+        let client_id = self.client_id.clone();
+        // 异步清理
+        tokio::spawn(async move {
+            state.remove_client(&client_id).await;
+            info!("SSE client {} cleaned up", client_id);
+        });
         println!("Client disconnected: {:?}", stats);
     }
 }
