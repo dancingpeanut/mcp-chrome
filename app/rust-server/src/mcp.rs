@@ -3,6 +3,7 @@ use rmcp::model::{CallToolRequestParam, CallToolResult, ErrorCode, Implementatio
 use rmcp::{ErrorData, RoleServer, ServerHandler};
 use rmcp::serde_json::from_str;
 use rmcp::service::RequestContext;
+use crate::proxy::ProxyState;
 
 #[derive(Clone, Default)]
 pub struct ChromeExtensionServer;
@@ -22,8 +23,11 @@ impl ServerHandler for ChromeExtensionServer {
     async fn list_tools(
         &self,
         _request: Option<PaginatedRequestParam>,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
+        let state = context.extensions.get::<ProxyState>();
+        tracing::info!("-- {:?}", state.is_some());
+
         tracing::info!("Listing tools");
         let input_schema = from_str::<JsonObject>(r#"
         {

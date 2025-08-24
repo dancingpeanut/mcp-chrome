@@ -9,7 +9,6 @@ use axum::{
 };
 use rmcp::transport::sse_server::SseServerConfig;
 use rmcp::transport::SseServer;
-use tracing::{error, info};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use crate::mcp::ChromeExtensionServer;
@@ -68,18 +67,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Start HTTP server
-    info!("Server started on {}", addr);
+    tracing::info!("Server started on {}", addr);
     let server = axum::serve(listener, app).with_graceful_shutdown(async move {
         // Wait for cancellation signal
         ct.cancelled().await;
-        info!("Server is shutting down...");
+        tracing::info!("Server is shutting down...");
     });
 
     if let Err(e) = server.await {
-        error!("Server error: {}", e);
+        tracing::error!("Server error: {}", e);
     }
 
-    info!("Server has been shut down");
+    tracing::info!("Server has been shut down");
 
     Ok(())
 }

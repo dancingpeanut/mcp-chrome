@@ -5,7 +5,6 @@ use dashmap::DashMap;
 use serde_json::Value;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::timeout;
-use tracing::{error, info, warn};
 use crate::common::{ApiResponse, MessageType, SseMessage};
 use crate::guard_sse_stream::{GuardListener, GuardedSseStream, SseStats};
 
@@ -38,14 +37,14 @@ impl ProxyState {
                                            Some(Duration::from_secs(15)));
 
         self.clients.insert(client_id, client.clone());
-        info!("Client connected: {}. Total clients: {}", client.client_id, self.clients.len());
+        tracing::info!("Client connected: {}. Total clients: {}", client.client_id, self.clients.len());
 
         (client, stream)
     }
 
     async fn remove_client(&self, client_id: &str) {
         if self.clients.remove(client_id).is_some() {
-            info!("Client remove: {}. Total clients: {}", client_id, self.clients.len());
+            tracing::info!("Client remove: {}. Total clients: {}", client_id, self.clients.len());
         }
     }
 
@@ -71,7 +70,7 @@ impl ProxyState {
 
         self.send_msg_to_client(client, message).await?;
 
-        info!("Waiting for response (request_id: {}, timeout: {}s)...", request_id, timeout_secs);
+        tracing::info!("Waiting for response (request_id: {}, timeout: {}s)...", request_id, timeout_secs);
 
         match timeout(Duration::from_secs(timeout_secs), rx).await {
             Ok(Ok(response)) => Ok(response),
@@ -80,7 +79,7 @@ impl ProxyState {
                 Err(anyhow!("Channel closed"))
             }
             Err(_) => {
-                warn!("Request timeout after {}s", timeout_secs);
+                tracing::warn!("Request timeout after {}s", timeout_secs);
                 self.pending_requests.remove(&request_id);
                 Err(anyhow!("Request timeout"))
             }
@@ -92,16 +91,16 @@ impl ProxyState {
             if pending.sender.send(response).is_err() {
                 return Err(anyhow!("Failed to send response to waiting handler"));
             } else {
-                info!("Response handled for request {}", request_id);
+                tracing::info!("Response handled for request {}", request_id);
             }
         } else {
-            warn!("No pending request found for ID: {}", request_id);
+            tracing::warn!("No pending request found for ID: {}", request_id);
         }
         Ok(())
     }
 
     async fn get_tools_from_client(&self, client: &ExtensionClient) -> Result<Vec<Value>> {
-        info!("Requesting tools from client... {}", client.client_id);
+        tracing::info!("Requesting tools from client... {}", client.client_id);
         let message = SseMessage::from_message_type(MessageType::GetTools);
 
         let response = self.request_client(client, message, 30).await?;
@@ -138,7 +137,7 @@ impl ProxyState {
     }
 
     pub async fn call_tool(&self, client_id: &str, tool_name: &str, args: Value) -> Result<Value> {
-        info!(
+        tracing::info!(
             "Calling tool,\n  client_id: {}\n  tool_name: {}\n  Arguments: {}",
             client_id,
             tool_name,
@@ -155,7 +154,7 @@ impl ProxyState {
                 return Ok(data);
             }
         } else {
-            error!("Failed to call tool: {:?}", response.error);
+            tracing::error!("Failed to call tool: {:?}", response.error);
         }
         Err(anyhow!("Failed to call tool: {}", tool_name))
     }
@@ -175,7 +174,7 @@ pub struct ClientListener {
 
 impl GuardListener for ClientListener {
     fn close(&self, stats: SseStats) {
-        info!(
+        tracing::info!(
             "StreamGuard dropped for client: {} (bytes sent: {}, messages sent: {}, duration: {:?})",
             self.client_id, stats.bytes_sent, stats.messages_sent, stats.duration
         );
@@ -185,7 +184,7 @@ impl GuardListener for ClientListener {
         // 异步清理
         tokio::spawn(async move {
             state.remove_client(&client_id).await;
-            info!("SSE client {} cleaned up", client_id);
+            tracing::info!("SSE client {} cleaned up", client_id);
         });
         println!("Client disconnected: {:?}", stats);
     }

@@ -7,7 +7,6 @@ use axum::response::{IntoResponse, Sse};
 use futures_util::Stream;
 use serde::{Deserialize};
 use serde_json::Value;
-use tracing::{error, warn};
 use crate::common::{ApiResponse, MessageType, SseMessage};
 use crate::proxy::ProxyState;
 
@@ -24,7 +23,7 @@ pub async fn sse(
 
     let connected_msg = SseMessage::from_message_type(MessageType::Connected);
     if let Err(e) = state.send_msg_to_client(&client, connected_msg).await {
-        warn!("Failed to send connected message to client: {}", e);
+        tracing::warn!("Failed to send connected message to client: {}", e);
     }
 
     Sse::new(stream).keep_alive(
@@ -46,7 +45,7 @@ pub(crate) async fn client_response(
                 Json(response.with_success("Response received".to_string())),
             ),
             Err(e) => {
-                error!("Failed to handle client response: {}", e);
+                tracing::error!("Failed to handle client response: {}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(response.with_error("Failed to handle client response".to_string()))
@@ -71,7 +70,7 @@ pub async fn list_tools(
             Json(ApiResponse::success(tools)),
         ),
         Err(e) => {
-            error!("Failed to list tools: {}", e);
+            tracing::error!("Failed to list tools: {}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ApiResponse::<Vec<Value>>::error("Failed to list tools".to_string())),
@@ -96,7 +95,7 @@ pub(crate) async fn call_tool(
             Json(ApiResponse::<Value>::success(result)),
         ),
         Err(e) => {
-            error!("Failed to call tool: {}", e);
+            tracing::error!("Failed to call tool: {}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ApiResponse::<Value>::error("Failed to call tool".to_string())),
