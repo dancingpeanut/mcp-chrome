@@ -4,6 +4,7 @@ mod handler;
 mod common;
 mod mcp;
 
+use std::env;
 use axum::{middleware, routing::{get, post}, Router};
 use axum::extract::{Path, Request};
 use axum::middleware::Next;
@@ -51,8 +52,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(proxy_state.clone())
         .merge(mcp_router);
 
-
-    let addr = "0.0.0.0:12306";
+    let port = env::var("PORT").unwrap_or_else(|_| "10824".to_string());
+    let addr = format!("0.0.0.0:{}", port);
     tracing::info!("Server started on {}", addr);
     let tcp_listener = tokio::net::TcpListener::bind(addr).await?;
     let _ = axum::serve(tcp_listener, router)

@@ -48,7 +48,10 @@
               type="text"
               placeholder="http://127.0.0.1:12306"
               class="config-input"
+              :class="{ 'editing': isEditingServerUrl }"
               :disabled="isConnected"
+              @focus="onServerUrlFocus"
+              @blur="onServerUrlBlur"
             />
             <button 
               @click="updateServerUrl" 
@@ -110,6 +113,7 @@ const currentServerUrl = ref('http://127.0.0.1:12306');
 const clientId = ref<string | null>(null);
 const mcpUrl = ref<string | null>(null);
 const lastUpdated = ref('Never');
+const isEditingServerUrl = ref(false);
 
 // Message listener cleanup
 let messageListener: ((message: any) => void) | null = null;
@@ -178,7 +182,12 @@ const updateServerUrl = async () => {
     });
     if (response && response.success) {
       console.log('Server URL updated successfully');
-      await updateStatus();
+      // 更新成功后，重置编辑状态
+      isEditingServerUrl.value = false;
+      // 更新当前服务器URL显示
+      currentServerUrl.value = serverUrlInput.value.trim();
+      // 可选：显示成功提示
+      console.log('Server URL updated and synchronized');
     } else {
       console.error('Failed to update server URL:', response?.error || 'Unknown error');
     }
@@ -198,6 +207,17 @@ const copyMcpUrl = async () => {
   }
 };
 
+const onServerUrlFocus = () => {
+  isEditingServerUrl.value = true;
+};
+
+const onServerUrlBlur = () => {
+  // 延迟设置，避免在点击Update按钮时立即重置
+  setTimeout(() => {
+    isEditingServerUrl.value = false;
+  }, 100);
+};
+
 const updateStatus = async () => {
   try {
     // 获取连接状态
@@ -215,7 +235,11 @@ const updateStatus = async () => {
       currentServerUrl.value = configResponse.config.serverUrl;
       clientId.value = configResponse.config.clientId;
       mcpUrl.value = configResponse.config.mcpUrl;
-      serverUrlInput.value = configResponse.config.serverUrl;
+      
+      // 只有在用户没有编辑时才自动更新输入框的值
+      if (!isEditingServerUrl.value) {
+        serverUrlInput.value = configResponse.config.serverUrl;
+      }
     }
   } catch (error) {
     console.error('Error getting status:', error);
@@ -234,6 +258,11 @@ const setupMessageListener = () => {
           mcpUrl.value = message.payload.mcpUrl;
           clientId.value = message.payload.clientId;
           currentServerUrl.value = message.payload.serverUrl;
+          
+          // 只有在用户没有编辑时才自动更新输入框的值
+          if (!isEditingServerUrl.value) {
+            serverUrlInput.value = message.payload.serverUrl;
+          }
         }
       } else {
         // 断开连接时清空MCP地址
@@ -500,6 +529,17 @@ onUnmounted(() => {
   background-color: #f5f5f5;
   color: #999;
   cursor: not-allowed;
+}
+
+.config-input.editing {
+  border-color: #2196f3;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.config-input.editing:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.3);
 }
 
 .btn:disabled {

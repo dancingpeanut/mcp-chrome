@@ -10,7 +10,7 @@ import { ICONS, NOTIFICATIONS, STORAGE_KEYS, ERROR_MESSAGES, SUCCESS_MESSAGES } 
 import { v4 as uuidv4 } from 'uuid';
 
 // 默认服务器URL
-const DEFAULT_SERVER_URL = 'http://127.0.0.1:12306';
+const DEFAULT_SERVER_URL = 'http://127.0.0.1:10824';
 
 // 获取或生成唯一client_id
 function getOrCreateClientId(): Promise<string> {
