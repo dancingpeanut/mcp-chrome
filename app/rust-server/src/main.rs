@@ -4,15 +4,17 @@ mod handler;
 mod common;
 mod mcp;
 
-use axum::{
-    routing::{get, post}, Router,
-};
+use axum::{middleware, routing::{get, post}, Router};
+use axum::extract::Request;
+use axum::middleware::Next;
 use rmcp::transport::sse_server::SseServerConfig;
 use rmcp::transport::SseServer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use crate::mcp::ChromeExtensionServer;
 use crate::proxy::ProxyState;
+
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,6 +30,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let addr = "0.0.0.0:12306";
 
+    let proxy_state = ProxyState::new();
+
     let config = SseServerConfig {
         bind: addr.parse()?,
         sse_path: "/sse".to_string(),
@@ -36,21 +40,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sse_keep_alive: None,
     };
 
-    let (sse_server, router) = SseServer::new(config);
+    let (sse_server, sse_router) = SseServer::new(config);
 
-    let proxy_state = ProxyState::new();
+    let sse_router = sse_router.layer(middleware::from_fn(|mut req: Request, next: Next| async move {
+        tracing::info!("Received SSE request: {:?}", req.uri().path_and_query());
+        next.run(req).await
+    }));
 
     let app = Router::new()
         .route("/_sse", get(handler::sse))
         .route("/api/client/response", post(handler::client_response))
         .route("/api/tool/list", get(handler::list_tools))
         .route("/api/tool/call", get(handler::call_tool))
-        .with_state(proxy_state)
-        .merge(router);
+        .with_state(proxy_state.clone())
+        .merge(sse_router);
 
     let listener = tokio::net::TcpListener::bind(sse_server.config.bind).await?;
 
-    let ct = sse_server.with_service(ChromeExtensionServer::default);
+    let ct = sse_server.with_service(move || {
+        ChromeExtensionServer::new(proxy_state.clone())
+    });
 
     // Handle signals for graceful shutdown
     let cancel_token = ct.clone();

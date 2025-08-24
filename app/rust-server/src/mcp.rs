@@ -5,8 +5,16 @@ use rmcp::serde_json::from_str;
 use rmcp::service::RequestContext;
 use crate::proxy::ProxyState;
 
-#[derive(Clone, Default)]
-pub struct ChromeExtensionServer;
+#[derive(Clone)]
+pub struct ChromeExtensionServer {
+    state: ProxyState
+}
+
+impl ChromeExtensionServer {
+    pub fn new(state: ProxyState) -> Self {
+        Self { state }
+    }
+}
 
 impl ServerHandler for ChromeExtensionServer {
     async fn call_tool(
@@ -22,11 +30,11 @@ impl ServerHandler for ChromeExtensionServer {
 
     async fn list_tools(
         &self,
-        _request: Option<PaginatedRequestParam>,
-        context: RequestContext<RoleServer>,
+        request: Option<PaginatedRequestParam>,
+        _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
-        let state = context.extensions.get::<ProxyState>();
-        tracing::info!("-- {:?}", state.is_some());
+        // tracing::info!("=== {:?}", _context.extensions.get::());
+        // let tools = self.state.get_tools()
 
         tracing::info!("Listing tools");
         let input_schema = from_str::<JsonObject>(r#"
