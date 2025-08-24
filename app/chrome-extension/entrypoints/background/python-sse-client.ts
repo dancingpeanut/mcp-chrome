@@ -130,7 +130,7 @@ class PythonSSEClient {
       const requestPayload = message.payload?.payload;
 
       try {
-        let response: any;
+        let result: any;
 
         switch (message.message_type) {
           case 'connected':
@@ -139,45 +139,32 @@ class PythonSSEClient {
 
           case 'get_tools':
             console.log('🛠️ PythonSSEClient: Python requesting tools list');
-            response = await this.getToolsResponse();
+            result = await this.getToolsResponse();
             break;
 
           case 'call_tool':
             console.log('🚀 PythonSSEClient: Python requesting tool execution:', requestPayload);
-            response = await this.callToolResponse(requestPayload);
+            result = await this.callToolResponse(requestPayload);
             break;
-
-          case 'keepalive':
-            // Handle keepalive - no action needed
-            console.log('💓 PythonSSEClient: Received keepalive message');
-            return;
 
           default:
             console.log('❓ PythonSSEClient: Unknown message type from Python:', message.message_type);
-            response = {
-              success: false,
-              error: `Unknown request type: ${message.message_type}`
-            };
+            throw new Error(`Unknown message type: ${message.message_type}`);
         }
 
-        console.log('📤 PythonSSEClient: Sending response to Python:', response);
+        console.log('📤 PythonSSEClient: Sending response to Python:', result);
 
         // Send response back to Python server
         if (requestId) {
-          await this.sendResponseToPython(requestId, response);
+          await this.sendResponseToPython(requestId, true, result, "");
         } else {
           console.warn('⚠️ PythonSSEClient: No request ID provided, cannot send response');
         }
 
       } catch (error) {
         console.error('❌ PythonSSEClient: Failed to handle Python request:', error);
-        const errorResponse = {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-        console.log('📤 PythonSSEClient: Sending error response to Python:', errorResponse);
         if (requestId) {
-          await this.sendResponseToPython(requestId, errorResponse);
+          await this.sendResponseToPython(requestId, false, null, String(error));
         }
       }
     } catch (error) {
@@ -237,17 +224,16 @@ class PythonSSEClient {
   /**
    * Send response to Python server
    */
-  private async sendResponseToPython(requestId: string, response: any): Promise<void> {
+  private async sendResponseToPython(request_id: string, success: boolean, data: any, error: string): Promise<void> {
     try {
       const responseData = {
-        requestId,
-        response
+        success,
+        request_id,
+        data,
+        error
       };
 
-      console.log('📤 PythonSSEClient: Sending response to Python server:');
-      console.log('   Request ID:', requestId);
-      console.log('   Response Data:', responseData);
-      console.log('   Target URL:', `${this.serverUrl}/api/client/response`);
+      console.log('📤 PythonSSEClient: Sending response to Python server:', responseData);
 
       const fetchResponse = await fetch(`${this.serverUrl}/api/client/response`, {
         method: 'POST',

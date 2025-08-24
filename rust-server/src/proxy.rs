@@ -9,7 +9,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::time::timeout;
 use tracing::{info, warn};
 use uuid::Uuid;
-use crate::common::{PendingRequest, ToolCallPayload};
+use crate::common::{ApiResponse};
 use crate::guard_sse_stream::{GuardListener, GuardedSseStream, SseStats};
 
 #[derive(Clone)]
@@ -65,7 +65,7 @@ impl ProxyState {
         client: &ExtensionClient,
         message: SseMessage,
         timeout_secs: u64,
-    ) -> Result<Value> {
+    ) -> Result<ApiResponse<Value>> {
         let request_id = message.request_id.clone();
         let (tx, rx) = oneshot::channel();
 
@@ -90,7 +90,7 @@ impl ProxyState {
         }
     }
 
-    pub fn handle_client_response(&self, request_id: &str, response: Value) -> Result<()> {
+    pub fn handle_client_response(&self, request_id: &str, response: ApiResponse<Value>) -> Result<()> {
         if let Some((_, pending)) = self.pending_requests.remove(request_id) {
             if pending.sender.send(response).is_err() {
                 return Err(anyhow!("Failed to send response to waiting handler"));
@@ -204,4 +204,9 @@ impl SseMessage {
             },
         }
     }
+}
+
+#[derive(Debug)]
+pub struct PendingRequest {
+    pub(crate) sender: oneshot::Sender<ApiResponse<Value>>,
 }

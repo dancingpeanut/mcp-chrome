@@ -3,11 +3,12 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::{mpsc, oneshot};
-
+use uuid::Uuid;
 // Data structures
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiResponse<T> {
+    pub request_id: Option<String>,
     pub(crate) success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) data: Option<T>,
@@ -16,20 +17,43 @@ pub struct ApiResponse<T> {
 }
 
 impl <T> ApiResponse<T> {
-    pub fn data(data: T) -> Self {
+    
+    pub fn new() -> Self {
         Self {
+            request_id: Some(Uuid::new_v4().to_string()),
             success: true,
-            data: Some(data),
+            data: None,
             error: None,
         }
     }
-
-    pub fn error(error: String) -> Self {
+    
+    pub fn new_with_request_id(request_id: String) -> Self {
         Self {
-            success: false,
+            request_id: Some(request_id),
+            success: true,
             data: None,
-            error: Some(error),
+            error: None,
         }
+    }
+    
+    pub fn with_success(mut self, data: T) -> Self {
+        self.success = true;
+        self.data = Some(data);
+        self
+    }
+
+    pub fn with_error(mut self, error: String) -> Self {
+        self.success = false;
+        self.error = Some(error);
+        self
+    }
+    
+    pub fn success(data: T) -> Self {
+        Self::new().with_success(data)
+    }
+    
+    pub fn error(error: String) -> Self {
+        Self::new().with_error(error)
     }
 }
 

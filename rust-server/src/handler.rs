@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{error, warn};
 use crate::{ClientQuery};
-use crate::common::{ApiResponse, ChromeResponsePayload};
+use crate::common::{ApiResponse};
 use crate::proxy::{MessageType, ProxyState, SseMessage};
 
 #[derive(Deserialize)]
@@ -37,28 +37,28 @@ pub async fn sse(
 
 pub(crate) async fn client_response(
     State(state): State<ProxyState>,
-    Json(payload): Json<ChromeResponsePayload>,
+    Json(client_response): Json<ApiResponse<Value>>,
 ) -> impl IntoResponse {
-    if payload.request_id.is_empty() {
-        warn!("Client response endpoint: No request ID provided");
-        return (
+    if let Some(request_id) = &client_response.request_id {
+        let response = ApiResponse::<String>::new_with_request_id(request_id.clone());
+        match state.handle_client_response(request_id, client_response.clone()) {
+            Ok(_) => (
+                StatusCode::OK,
+                Json(response.with_success("Response received".to_string())),
+            ),
+            Err(e) => {
+                error!("Failed to handle client response: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(response.with_error("Failed to handle client response".to_string()))
+                )
+            },
+        }
+    } else {
+        (
             StatusCode::BAD_REQUEST,
-            Json(ApiResponse::<String>::error("No request ID provided".to_string())),
-        );
-    }
-
-    match state.handle_client_response(&payload.request_id, payload.response) {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(ApiResponse::<String>::data("Response received".to_string())),
-        ),
-        Err(e) => {
-            error!("Failed to handle client response: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<String>::error("Failed to handle client response".to_string()))
-            )
-        },
+            Json(ApiResponse::<String>::error("Request ID is required".to_string())),
+        )
     }
 }
 
@@ -69,7 +69,7 @@ pub async fn list_tools(
     match state.get_tools(&params.client_id).await {
         Ok(tools) => (
             StatusCode::OK,
-            Json(ApiResponse::data(tools)),
+            Json(ApiResponse::success(tools)),
         ),
         Err(e) => {
             error!("Failed to list tools: {}", e);
