@@ -6,43 +6,18 @@ use axum::Json;
 use axum::response::{IntoResponse, Sse};
 use futures_util::Stream;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tracing::{error, warn};
-use crate::common::{ChromeResponsePayload};
+use crate::{ClientQuery};
+use crate::common::{ApiResponse, ChromeResponsePayload};
 use crate::proxy::{MessageType, ProxyState, SseMessage};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApiResponse<T> {
-    pub(crate) success: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) data: Option<T>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) error: Option<String>,
-}
-
-impl <T> ApiResponse<T> {
-    pub fn data(data: T) -> Self {
-        Self {
-            success: true,
-            data: Some(data),
-            error: None,
-        }
-    }
-
-    pub fn error(error: String) -> Self {
-        Self {
-            success: false,
-            data: None,
-            error: Some(error),
-        }
-    }
-}
 
 #[derive(Deserialize)]
 pub struct SseQuery {
     pub client_id: String,
 }
 
-pub async fn sse_handler(
+pub async fn sse(
     Query(params): Query<SseQuery>,
     State(state): State<ProxyState>,
 ) -> Sse<impl Stream<Item = Result<axum::response::sse::Event, Infallible>>> {
@@ -60,7 +35,7 @@ pub async fn sse_handler(
     )
 }
 
-pub(crate) async fn client_response_handler(
+pub(crate) async fn client_response(
     State(state): State<ProxyState>,
     Json(payload): Json<ChromeResponsePayload>,
 ) -> impl IntoResponse {
@@ -84,5 +59,24 @@ pub(crate) async fn client_response_handler(
                 Json(ApiResponse::<String>::error("Failed to handle client response".to_string()))
             )
         },
+    }
+}
+
+pub async fn list_tools(
+    Query(params): Query<ClientQuery>,
+    State(state): State<ProxyState>,
+) -> impl IntoResponse {
+    match state.get_tools(&params.client_id).await {
+        Ok(tools) => (
+            StatusCode::OK,
+            Json(ApiResponse::data(tools)),
+        ),
+        Err(e) => {
+            error!("Failed to list tools: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse::<Vec<Value>>::error("Failed to list tools".to_string())),
+            )
+        }
     }
 }

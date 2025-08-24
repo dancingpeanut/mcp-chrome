@@ -5,8 +5,36 @@ use serde_json::Value;
 use tokio::sync::{mpsc, oneshot};
 
 // Data structures
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiResponse<T> {
+    pub(crate) success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) data: Option<T>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) error: Option<String>,
+}
+
+impl <T> ApiResponse<T> {
+    pub fn data(data: T) -> Self {
+        Self {
+            success: true,
+            data: Some(data),
+            error: None,
+        }
+    }
+
+    pub fn error(error: String) -> Self {
+        Self {
+            success: false,
+            data: None,
+            error: Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiResponseold<T> {
     pub(crate) success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) data: Option<T>,

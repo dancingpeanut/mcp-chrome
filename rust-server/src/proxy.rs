@@ -39,7 +39,7 @@ impl ProxyState {
         };
         let stream = GuardedSseStream::new(rx, listener,
                                            Some(Duration::from_secs(15)));
-        
+
         self.clients.insert(client_id, client.clone());
         info!("Client connected: {}. Total clients: {}", client.client_id, self.clients.len());
 
@@ -108,11 +108,12 @@ impl ProxyState {
         let message = SseMessage::from_message_type(MessageType::GetTools);
 
         let response = self.request_client(client, message, 30).await?;
-        
+        println!("response: {:?}", response);
+
         Err(anyhow!("Failed to get tools from client"))
     }
 
-    async fn get_tools(&self, client_id: &str) -> Result<Vec<Value>> {
+    pub(crate) async fn get_tools(&self, client_id: &str) -> Result<Vec<Value>> {
         let client = self.clients.get(client_id)
             .map(|c| c.clone())
             .ok_or_else(|| anyhow!("Client {} not found", client_id))?;
@@ -132,7 +133,7 @@ impl ProxyState {
                 return Ok(tools.clone())
             }
         }
-        
+
         Ok(tools)
     }
 

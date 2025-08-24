@@ -27,16 +27,10 @@ function getOrCreateClientId(): Promise<string> {
 }
 
 interface SSEMessage {
-  type: string;
+  message_type: string;
   payload: any;
   timestamp: string;
-  requestId?: string;
-}
-
-interface PendingRequest {
-  resolve: (value: any) => void;
-  reject: (reason?: any) => void;
-  timeoutId: NodeJS.Timeout;
+  request_id?: string;
 }
 
 let sseClientInitialized = false;
@@ -47,7 +41,6 @@ class PythonSSEClient {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
-  private pendingRequests = new Map<string, PendingRequest>();
   private serverUrl = 'http://127.0.0.1:12306';
   private tools: Map<string, any> = new Map();
   private clientId: string | null = null;
@@ -126,31 +119,66 @@ class PythonSSEClient {
   /**
    * Handle SSE messages from Python server
    */
-  private handleSSEMessage(event: MessageEvent): void {
+  private async handleSSEMessage(event: MessageEvent): Promise<void> {
+    console.log('Received SSE message:', event.data);
     if (event.data === 'heartbeat') {
       return
     }
     try {
       const message: SSEMessage = JSON.parse(event.data);
-      console.log('📨 PythonSSEClient: Received SSE message:', message);
+      const requestId = message.request_id;
+      const requestPayload = message.payload?.payload;
 
-      switch (message.type) {
-        case 'connected':
-          console.log('✅ PythonSSEClient: SSE connection confirmed');
-          break;
+      try {
+        let response: any;
 
-        case 'keepalive':
-          // Handle keepalive - no action needed
-          console.log('💓 PythonSSEClient: Received keepalive message');
-          break;
+        switch (message.message_type) {
+          case 'connected':
+            console.log('✅ PythonSSEClient: SSE connection confirmed');
+            return;
 
-        case 'op':
-          console.log('🔔 PythonSSEClient: Python server requesting data:', message);
-          this.handlePythonRequest(message);
-          break;
+          case 'get_tools':
+            console.log('🛠️ PythonSSEClient: Python requesting tools list');
+            response = await this.getToolsResponse();
+            break;
 
-        default:
-          console.log('❓ PythonSSEClient: Unknown message type:', message.type);
+          case 'call_tool':
+            console.log('🚀 PythonSSEClient: Python requesting tool execution:', requestPayload);
+            response = await this.callToolResponse(requestPayload);
+            break;
+
+          case 'keepalive':
+            // Handle keepalive - no action needed
+            console.log('💓 PythonSSEClient: Received keepalive message');
+            return;
+
+          default:
+            console.log('❓ PythonSSEClient: Unknown message type from Python:', message.message_type);
+            response = {
+              success: false,
+              error: `Unknown request type: ${message.message_type}`
+            };
+        }
+
+        console.log('📤 PythonSSEClient: Sending response to Python:', response);
+
+        // Send response back to Python server
+        if (requestId) {
+          await this.sendResponseToPython(requestId, response);
+        } else {
+          console.warn('⚠️ PythonSSEClient: No request ID provided, cannot send response');
+        }
+
+      } catch (error) {
+        console.error('❌ PythonSSEClient: Failed to handle Python request:', error);
+        const errorResponse = {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+        console.log('📤 PythonSSEClient: Sending error response to Python:', errorResponse);
+        if (requestId) {
+          await this.sendResponseToPython(requestId, errorResponse);
+        }
       }
     } catch (error) {
       console.error('❌ PythonSSEClient: Failed to parse SSE message:', error);
@@ -158,66 +186,10 @@ class PythonSSEClient {
   }
 
   /**
-   * Handle requests from Python server
-   */
-  private async handlePythonRequest(message: SSEMessage): Promise<void> {
-    const requestId = message.requestId;
-    const requestType = message.payload?.type;
-    const requestPayload = message.payload?.payload;
-
-    console.log('   Full Message:', message);
-
-    try {
-      let response: any;
-
-      switch (requestType) {
-        case 'get_tools':
-          console.log('🛠️ PythonSSEClient: Python requesting tools list');
-          response = await this.getToolsResponse();
-          break;
-
-        case 'call_tool':
-          console.log('🚀 PythonSSEClient: Python requesting tool execution:', requestPayload);
-          response = await this.callToolResponse(requestPayload);
-          break;
-
-        default:
-          console.log('❓ PythonSSEClient: Unknown request type from Python:', requestType);
-          response = {
-            success: false,
-            error: `Unknown request type: ${requestType}`
-          };
-      }
-
-      console.log('📤 PythonSSEClient: Sending response to Python:', response);
-
-      // Send response back to Python server
-      if (requestId) {
-        await this.sendResponseToPython(requestId, response);
-      } else {
-        console.warn('⚠️ PythonSSEClient: No request ID provided, cannot send response');
-      }
-
-    } catch (error) {
-      console.error('❌ PythonSSEClient: Failed to handle Python request:', error);
-      const errorResponse = {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-      console.log('📤 PythonSSEClient: Sending error response to Python:', errorResponse);
-      if (requestId) {
-        await this.sendResponseToPython(requestId, errorResponse);
-      }
-    }
-  }
-
-  /**
    * Get tools response for Python server
    */
   private async getToolsResponse(): Promise<any> {
-    console.log(this.tools);
     console.log(TOOL_SCHEMAS);
-    const toolsList = Array.from(this.tools.keys());
     return {
       success: true,
       data: TOOL_SCHEMAS

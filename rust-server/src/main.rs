@@ -29,7 +29,7 @@ use tokio::{
 use tower_http::cors::CorsLayer;
 use tracing::{error, info, warn};
 use uuid::Uuid;
-use crate::common::{ApiResponse, ChromeResponsePayload, ClientExtension, OpPayload, PendingRequest, SseMessage, ToolCallPayload};
+use crate::common::{ApiResponseold, ChromeResponsePayload, ClientExtension, OpPayload, PendingRequest, SseMessage, ToolCallPayload};
 use crate::proxy::ProxyState;
 
 // Constants
@@ -475,7 +475,7 @@ async fn chrome_response_handler(
         warn!("Chrome response endpoint: No request ID provided");
         return (
             StatusCode::BAD_REQUEST,
-            Json(ApiResponse::<String> {
+            Json(ApiResponseold::<String> {
                 success: false,
                 data: None,
                 error: Some("No request ID provided".to_string()),
@@ -487,7 +487,7 @@ async fn chrome_response_handler(
 
     (
         StatusCode::OK,
-        Json(ApiResponse::<String> {
+        Json(ApiResponseold::<String> {
             success: true,
             data: Some("Response received".to_string()),
             error: None,
@@ -507,7 +507,7 @@ async fn list_tools_handler(
     if !state.sse_clients.contains_key(&params.client_id) {
         return (
             StatusCode::BAD_REQUEST,
-            Json(ApiResponse::<Vec<Value>> {
+            Json(ApiResponseold::<Vec<Value>> {
                 success: false,
                 data: None,
                 error: Some("Client not connected".to_string()),
@@ -518,7 +518,7 @@ async fn list_tools_handler(
     match state.get_tools(&params.client_id).await {
         Ok(tools) => (
             StatusCode::OK,
-            Json(ApiResponse {
+            Json(ApiResponseold {
                 success: true,
                 data: Some(tools),
                 error: None,
@@ -528,7 +528,7 @@ async fn list_tools_handler(
             error!("Failed to list tools: {}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Vec<Value>> {
+                Json(ApiResponseold::<Vec<Value>> {
                     success: false,
                     data: None,
                     error: Some(e),
@@ -545,7 +545,7 @@ async fn call_tool_handler(
     if !state.sse_clients.contains_key(&params.client_id) {
         return (
             StatusCode::BAD_REQUEST,
-            Json(ApiResponse::<Value> {
+            Json(ApiResponseold::<Value> {
                 success: false,
                 data: None,
                 error: Some("Client not connected".to_string()),
@@ -564,7 +564,7 @@ async fn call_tool_handler(
     {
         Ok(result) => (
             StatusCode::OK,
-            Json(ApiResponse::<Value> {
+            Json(ApiResponseold::<Value> {
                 success: true,
                 data: Some(result),
                 error: None,
@@ -574,7 +574,7 @@ async fn call_tool_handler(
             error!("Failed to call tool: {}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Value> {
+                Json(ApiResponseold::<Value> {
                     success: false,
                     data: None,
                     error: Some(e),
@@ -600,8 +600,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // .route("/api/tool/call", get(call_tool_handler))
         // .layer(CorsLayer::permissive())
         // .with_state(state)
-        .route("/_sse", get(handler::sse_handler))
-        .route("/api/client/response", post(handler::client_response_handler))
+        .route("/_sse", get(handler::sse))
+        .route("/api/client/response", post(handler::client_response))
+        .route("/api/tool/list", get(handler::list_tools))
         .with_state(proxy_state);
 
     let addr = "0.0.0.0:12306";
