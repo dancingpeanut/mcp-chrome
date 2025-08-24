@@ -4,10 +4,10 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::timeout;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 use crate::common::{ApiResponse};
 use crate::guard_sse_stream::{GuardListener, GuardedSseStream, SseStats};
@@ -143,13 +143,27 @@ impl ProxyState {
         Ok(tools)
     }
 
-    async fn call_chrome_tool(
-        &self,
-        client_id: &str,
-        tool_name: &str,
-        args: Value,
-    ) -> Result<Value, String> {
-        Ok(Value::Null)
+    pub async fn call_tool(&self, client_id: &str, tool_name: &str, args: Value) -> Result<Value> {
+        info!(
+            "Calling tool,\n  client_id: {}\n  tool_name: {}\n  Arguments: {}",
+            client_id,
+            tool_name,
+            serde_json::to_string_pretty(&args).unwrap_or_default()
+        );
+        let client = self.clients.get(client_id)
+            .map(|c| c.clone())
+            .ok_or_else(|| anyhow!("Client {} not found", client_id))?;
+        let message = SseMessage::from_message_type(MessageType::CallTool(tool_name.to_string(), args));
+        let response = self.request_client(&client, message, 300).await?;
+
+        if response.success {
+            if let Some(data) = response.data {
+                return Ok(data);
+            }
+        } else {
+            error!("Failed to call tool: {:?}", response.error);
+        }
+        Err(anyhow!("Failed to call tool: {}", tool_name))
     }
 }
 
@@ -204,7 +218,10 @@ impl SseMessage {
             },
             MessageType::CallTool(name, args) => Self {
                 message_type: "call_tool".to_string(),
-                payload: None,
+                payload: Some(json!({
+                    "name": name,
+                    "args": args
+                })),
                 timestamp,
                 request_id,
             },

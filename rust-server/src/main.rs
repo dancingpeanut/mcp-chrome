@@ -603,6 +603,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/_sse", get(handler::sse))
         .route("/api/client/response", post(handler::client_response))
         .route("/api/tool/list", get(handler::list_tools))
+        .route("/api/tool/call", get(handler::call_tool))
         .with_state(proxy_state);
 
     let addr = "0.0.0.0:12306";

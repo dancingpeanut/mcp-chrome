@@ -127,7 +127,7 @@ class PythonSSEClient {
     try {
       const message: SSEMessage = JSON.parse(event.data);
       const requestId = message.request_id;
-      const requestPayload = message.payload?.payload;
+      const requestPayload = message.payload;
 
       try {
         let result: any;
@@ -184,6 +184,7 @@ class PythonSSEClient {
    * Call tool response for Python server
    */
   private async callToolResponse(payload: any): Promise<any> {
+    console.log('🚀 PythonSSEClient: Calling tool:', payload)
     const toolName = payload?.name;
     const args = payload?.args;
 

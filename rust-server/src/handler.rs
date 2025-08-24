@@ -8,8 +8,8 @@ use futures_util::Stream;
 use serde::{Deserialize};
 use serde_json::Value;
 use tracing::{error, warn};
-use crate::{ClientQuery};
-use crate::common::{ApiResponse};
+use crate::{AppState, ClientQuery};
+use crate::common::{ApiResponse, ApiResponseold};
 use crate::proxy::{MessageType, ProxyState, SseMessage};
 
 #[derive(Deserialize)]
@@ -76,6 +76,31 @@ pub async fn list_tools(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ApiResponse::<Vec<Value>>::error("Failed to list tools".to_string())),
+            )
+        }
+    }
+}
+
+pub(crate) async fn call_tool(
+    Query(params): Query<ClientQuery>,
+    State(state): State<ProxyState>,
+) -> impl IntoResponse {
+    let tool_name = "chrome_navigate";
+    let mut tool_args = serde_json::Map::new();
+    tool_args.insert("url".to_string(), Value::String("https://www.baidu.com/".to_string()));
+    tool_args.insert("newWindow".to_string(), Value::Bool(false));
+
+    let result = state.call_tool(&params.client_id, tool_name, Value::from(tool_args)).await;
+    match result {
+        Ok(result) => (
+            StatusCode::OK,
+            Json(ApiResponse::<Value>::success(result)),
+        ),
+        Err(e) => {
+            error!("Failed to call tool: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse::<Value>::error("Failed to call tool".to_string())),
             )
         }
     }
