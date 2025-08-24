@@ -2,7 +2,7 @@
 
 ## 📋 当前状态
 
-popup 页面目前只显示 **Python Server SSE** 功能，其他功能已隐藏但代码保留。
+popup 页面目前只显示 **Cloud Server SSE** 功能，其他功能已隐藏但代码保留。
 
 ## 🔧 如何重新显示其他功能
 
@@ -136,7 +136,7 @@ sed -i 's/v-if="false"/v-if="true"/g' App.vue
 ## 📚 相关文件
 
 - `App.vue` - 主要的 popup 页面组件
-- `PythonSSEStatus.vue` - Python SSE 状态组件
+- `CloudSSEStatus.vue` - Python SSE 状态组件
 - 其他组件文件保持不变
 
 通过这种方式，你可以灵活控制 popup 页面显示哪些功能，而无需删除任何代码。

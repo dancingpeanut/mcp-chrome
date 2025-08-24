@@ -20,8 +20,7 @@
       
       <!-- Python SSE Status Section - 保持显示 -->
       <div class="section">
-        <h2 class="section-title">Python Server SSE</h2>
-        <PythonSSEStatus />
+        <CloudSSEStatus />
       </div>
 
       <!-- 其他部分使用 v-if="false" 隐藏，但保留代码 -->
@@ -253,7 +252,7 @@
     </div>
 
     <div class="footer">
-      <p class="footer-text">Python Server for Chrome Extension</p>
+      <p class="footer-text">Cloud Server for Chrome Extension</p>
     </div>
 
     <!-- ConfirmDialog - 隐藏但保留 -->
@@ -296,7 +295,7 @@ import { getMessage } from '@/utils/i18n';
 import ConfirmDialog from './components/ConfirmDialog.vue';
 import ProgressIndicator from './components/ProgressIndicator.vue';
 import ModelCacheManagement from './components/ModelCacheManagement.vue';
-import PythonSSEStatus from './components/PythonSSEStatus.vue';
+import CloudSSEStatus from './components/CloudSSEStatus.vue';
 import {
   DocumentIcon,
   DatabaseIcon,

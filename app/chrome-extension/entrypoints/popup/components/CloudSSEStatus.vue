@@ -1,7 +1,7 @@
 <template>
   <div class="python-sse-status">
     <div class="status-header">
-      <h3>Python Server Status</h3>
+      <h3>Server Status</h3>
       <div class="status-indicator" :class="{ connected: isConnected, disconnected: !isConnected }">
         <span class="status-dot"></span>
         {{ isConnected ? 'Connected' : 'Disconnected' }}

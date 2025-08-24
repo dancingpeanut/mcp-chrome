@@ -4,7 +4,7 @@ import {
   initializeSemanticEngineIfCached,
 } from './semantic-similarity';
 import { initStorageManagerListener } from './storage-manager';
-import { initPythonSSEClient } from './python-sse-client';
+import { initCloudSSEClient } from './python-sse-client';
 import { cleanupModelCache } from '@/utils/semantic-similarity-engine';
 
 /**
@@ -16,7 +16,7 @@ export default defineBackground(() => {
   initHttpServerListener();
   initSemanticSimilarityListener();
   initStorageManagerListener();
-  initPythonSSEClient();
+  initCloudSSEClient();
 
   // Conditionally initialize semantic similarity engine if model cache exists
   initializeSemanticEngineIfCached()

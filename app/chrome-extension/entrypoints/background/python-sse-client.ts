@@ -1,5 +1,5 @@
 /**
- * Python Server SSE Client for Chrome Extension
+ * Cloud Server SSE Client for Chrome Extension
  * Handles Server-Sent Events connection and bidirectional communication
  */
 
@@ -35,7 +35,7 @@ interface SSEMessage {
 
 let sseClientInitialized = false;
 
-class PythonSSEClient {
+class CloudSSEClient {
   private eventSource: EventSource | null = null;
   private isConnected = false;
   private reconnectAttempts = 0;
@@ -57,14 +57,14 @@ class PythonSSEClient {
           this.tools.set(tool.name, tool);
         }
       });
-      console.log(`PythonSSEClient: Initialized ${this.tools.size} tools`);
+      console.log(`CloudSSEClient: Initialized ${this.tools.size} tools`);
     }).catch((error) => {
-      console.error('PythonSSEClient: Failed to initialize tools:', error);
+      console.error('CloudSSEClient: Failed to initialize tools:', error);
     });
   }
 
   /**
-   * Connect to Python server via SSE
+   * Connect to Cloud server via SSE
    */
   async connect(): Promise<boolean> {
     // 先断开已有连接，确保只有一个SSE连接
@@ -81,10 +81,10 @@ class PythonSSEClient {
         this.clientId = await getOrCreateClientId();
       }
       const sseUrl = `${this.serverUrl}/_sse?client_id=${encodeURIComponent(this.clientId)}`;
-      console.log(`PythonSSEClient: Connecting to ${sseUrl}`);
+      console.log(`CloudSSEClient: Connecting to ${sseUrl}`);
       this.eventSource = new EventSource(sseUrl);
       this.eventSource.onopen = () => {
-        console.log('PythonSSEClient: SSE connection opened');
+        console.log('CloudSSEClient: SSE connection opened');
         this.isConnected = true;
         this.reconnectAttempts = 0;
         this.broadcastConnectionStatus(true);
@@ -93,18 +93,18 @@ class PythonSSEClient {
         this.handleSSEMessage(event);
       };
       this.eventSource.onerror = (error) => {
-        console.error('PythonSSEClient: SSE connection error:', error);
+        console.error('CloudSSEClient: SSE connection error:', error);
         this.handleConnectionError();
       };
       return true;
     } catch (error) {
-      console.error('PythonSSEClient: Failed to connect:', error);
+      console.error('CloudSSEClient: Failed to connect:', error);
       return false;
     }
   }
 
   /**
-   * Disconnect from Python server
+   * Disconnect from Cloud server
    */
   disconnect(): void {
     if (this.eventSource) {
@@ -113,11 +113,11 @@ class PythonSSEClient {
     }
     this.isConnected = false;
     this.broadcastConnectionStatus(false);
-    console.log('PythonSSEClient: Disconnected from Python server');
+    console.log('CloudSSEClient: Disconnected from Cloud server');
   }
 
   /**
-   * Handle SSE messages from Python server
+   * Handle SSE messages from Cloud server
    */
   private async handleSSEMessage(event: MessageEvent): Promise<void> {
     console.log('Received SSE message:', event.data);
@@ -134,46 +134,46 @@ class PythonSSEClient {
 
         switch (message.message_type) {
           case 'connected':
-            console.log('✅ PythonSSEClient: SSE connection confirmed');
+            console.log('✅ CloudSSEClient: SSE connection confirmed');
             return;
 
           case 'get_tools':
-            console.log('🛠️ PythonSSEClient: Python requesting tools list');
+            console.log('🛠️ CloudSSEClient: Cloud requesting tools list');
             result = await this.getToolsResponse();
             break;
 
           case 'call_tool':
-            console.log('🚀 PythonSSEClient: Python requesting tool execution:', requestPayload);
+            console.log('🚀 CloudSSEClient: Cloud requesting tool execution:', requestPayload);
             result = await this.callToolResponse(requestPayload);
             break;
 
           default:
-            console.log('❓ PythonSSEClient: Unknown message type from Python:', message.message_type);
+            console.log('❓ CloudSSEClient: Unknown message type from Cloud:', message.message_type);
             throw new Error(`Unknown message type: ${message.message_type}`);
         }
 
-        console.log('📤 PythonSSEClient: Sending response to Python:', result);
+        console.log('📤 CloudSSEClient: Sending response to Cloud:', result);
 
-        // Send response back to Python server
+        // Send response back to Cloud server
         if (requestId) {
-          await this.sendResponseToPython(requestId, true, result, "");
+          await this.sendResponseToCloud(requestId, true, result, "");
         } else {
-          console.warn('⚠️ PythonSSEClient: No request ID provided, cannot send response');
+          console.warn('⚠️ CloudSSEClient: No request ID provided, cannot send response');
         }
 
       } catch (error) {
-        console.error('❌ PythonSSEClient: Failed to handle Python request:', error);
+        console.error('❌ CloudSSEClient: Failed to handle Cloud request:', error);
         if (requestId) {
-          await this.sendResponseToPython(requestId, false, null, String(error));
+          await this.sendResponseToCloud(requestId, false, null, String(error));
         }
       }
     } catch (error) {
-      console.error('❌ PythonSSEClient: Failed to parse SSE message:', error);
+      console.error('❌ CloudSSEClient: Failed to parse SSE message:', error);
     }
   }
 
   /**
-   * Get tools response for Python server
+   * Get tools response for Cloud server
    */
   private async getToolsResponse(): Promise<any> {
     console.log(TOOL_SCHEMAS);
@@ -181,10 +181,10 @@ class PythonSSEClient {
   }
 
   /**
-   * Call tool response for Python server
+   * Call tool response for Cloud server
    */
   private async callToolResponse(payload: any): Promise<any> {
-    console.log('🚀 PythonSSEClient: Calling tool:', payload)
+    console.log('🚀 CloudSSEClient: Calling tool:', payload)
     const toolName = payload?.name;
     const args = payload?.args;
 
@@ -220,9 +220,9 @@ class PythonSSEClient {
   }
 
   /**
-   * Send response to Python server
+   * Send response to Cloud server
    */
-  private async sendResponseToPython(request_id: string, success: boolean, data: any, error: string): Promise<void> {
+  private async sendResponseToCloud(request_id: string, success: boolean, data: any, error: string): Promise<void> {
     try {
       const responseData = {
         success,
@@ -231,7 +231,7 @@ class PythonSSEClient {
         error
       };
 
-      console.log('📤 PythonSSEClient: Sending response to Python server:', responseData);
+      console.log('📤 CloudSSEClient: Sending response to Cloud server:', responseData);
 
       const fetchResponse = await fetch(`${this.serverUrl}/api/client/response`, {
         method: 'POST',
@@ -246,24 +246,24 @@ class PythonSSEClient {
       }
 
       const result = await fetchResponse.json();
-      console.log('✅ PythonSSEClient: Response sent successfully to Python server');
+      console.log('✅ CloudSSEClient: Response sent successfully to Cloud server');
       console.log('   Server response:', result);
     } catch (error) {
-      console.error('❌ PythonSSEClient: Failed to send response to Python server:', error);
+      console.error('❌ CloudSSEClient: Failed to send response to Cloud server:', error);
     }
   }
 
   /**
-   * Send message to Python server
+   * Send message to Cloud server
    */
-  async sendMessageToPython(type: string, payload: any): Promise<boolean> {
+  async sendMessageToCloud(type: string, payload: any): Promise<boolean> {
     try {
       const messageData = {
         type,
         payload
       };
 
-      console.log('📤 PythonSSEClient: Sending message to Python server:');
+      console.log('📤 CloudSSEClient: Sending message to Cloud server:');
       console.log('   Message Type:', type);
       console.log('   Payload:', payload);
       console.log('   Target URL:', `${this.serverUrl}/api/chrome/message`);
@@ -281,11 +281,11 @@ class PythonSSEClient {
       }
 
       const result = await response.json();
-      console.log('✅ PythonSSEClient: Message sent successfully to Python server');
+      console.log('✅ CloudSSEClient: Message sent successfully to Cloud server');
       console.log('   Server response:', result);
       return result.success;
     } catch (error) {
-      console.error('❌ PythonSSEClient: Failed to send message to Python server:', error);
+      console.error('❌ CloudSSEClient: Failed to send message to Cloud server:', error);
       return false;
     }
   }
@@ -299,13 +299,13 @@ class PythonSSEClient {
 
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      console.log(`PythonSSEClient: Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+      console.log(`CloudSSEClient: Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
       
       setTimeout(() => {
         this.connect();
       }, this.reconnectDelay * this.reconnectAttempts);
     } else {
-      console.error('PythonSSEClient: Max reconnection attempts reached');
+      console.error('CloudSSEClient: Max reconnection attempts reached');
       this.showConnectionErrorNotification();
     }
   }
@@ -317,8 +317,8 @@ class PythonSSEClient {
     chrome.notifications.create({
       type: 'basic',
       iconUrl: ICONS.NOTIFICATION, // 使用现有的通知图标
-      title: 'Python Server Connection Failed',
-      message: 'Failed to connect to Python server after multiple attempts'
+      title: 'Cloud Server Connection Failed',
+      message: 'Failed to connect to Cloud server after multiple attempts'
     });
   }
 
@@ -353,20 +353,20 @@ class PythonSSEClient {
 }
 
 // Create global instance
-export const pythonSSEClient = new PythonSSEClient();
+export const pythonSSEClient = new CloudSSEClient();
 
 /**
- * Initialize Python SSE client
+ * Initialize Cloud SSE client
  */
-export const initPythonSSEClient = () => {
+export const initCloudSSEClient = () => {
   if (sseClientInitialized) return;
   sseClientInitialized = true;
   // Auto-connect on startup
   pythonSSEClient.connect().then((success) => {
     if (success) {
-      console.log('PythonSSEClient: Auto-connection successful');
+      console.log('CloudSSEClient: Auto-connection successful');
     } else {
-      console.log('PythonSSEClient: Auto-connection failed');
+      console.log('CloudSSEClient: Auto-connection failed');
     }
   });
 
@@ -395,7 +395,7 @@ export const initPythonSSEClient = () => {
 
     if (message.type === 'SEND_MESSAGE_TO_PYTHON') {
       const { type, payload } = message;
-      pythonSSEClient.sendMessageToPython(type, payload).then((success) => {
+      pythonSSEClient.sendMessageToCloud(type, payload).then((success) => {
         sendResponse({ success });
       });
       return true;
