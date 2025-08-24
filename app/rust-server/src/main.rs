@@ -16,7 +16,7 @@ use crate::mcp::ChromeExtensionServer;
 use crate::proxy::ProxyState;
 
 async fn inject_client_id(Path(client_id): Path<String>, mut req: Request, next: Next) -> impl IntoResponse {
-    tracing::info!("MCP request, client_id: {}", client_id);
+    tracing::info!("MCP client request, client_id: {}", client_id);
     req.headers_mut().insert("client_id", client_id.parse().unwrap());
     next.run(req).await
 }

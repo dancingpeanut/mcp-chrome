@@ -37,14 +37,14 @@ impl ProxyState {
                                            Some(Duration::from_secs(15)));
 
         self.clients.insert(client_id, client.clone());
-        tracing::info!("Client connected: {}. Total clients: {}", client.client_id, self.clients.len());
+        tracing::info!("Extension client connected: {}. Total clients: {}", client.client_id, self.clients.len());
 
         (client, stream)
     }
 
     async fn remove_client(&self, client_id: &str) {
         if self.clients.remove(client_id).is_some() {
-            tracing::info!("Client remove: {}. Total clients: {}", client_id, self.clients.len());
+            tracing::info!("Extension client remove: {}. Total clients: {}", client_id, self.clients.len());
         }
     }
 
@@ -52,7 +52,7 @@ impl ProxyState {
     pub async fn send_msg_to_client(&self, client: &ExtensionClient, message: SseMessage) -> Result<()> {
         let msg_content = serde_json::to_string(&message)?;
         client.sender.send(msg_content)
-            .map_err(|e| anyhow!("Failed to send message to client {}: {}", client.client_id, e))
+            .map_err(|e| anyhow!("Failed to send message to extension client {}: {}", client.client_id, e))
     }
 
     /// 请求client端，并等待结果
@@ -112,7 +112,7 @@ impl ProxyState {
             }
         }
 
-        Err(anyhow!("Failed to get tools from client"))
+        Err(anyhow!("Failed to get tools from extension client"))
     }
 
     pub(crate) async fn get_tools(&self, client_id: &str) -> Result<Vec<Value>> {
@@ -145,7 +145,7 @@ impl ProxyState {
         );
         let client = self.clients.get(client_id)
             .map(|c| c.clone())
-            .ok_or_else(|| anyhow!("Client {} not found", client_id))?;
+            .ok_or_else(|| anyhow!("Extension client {} not found", client_id))?;
         let message = SseMessage::from_message_type(MessageType::CallTool(tool_name.to_string(), args));
         let response = self.request_client(&client, message, 300).await?;
 
@@ -186,7 +186,7 @@ impl GuardListener for ClientListener {
             state.remove_client(&client_id).await;
             tracing::info!("SSE client {} cleaned up", client_id);
         });
-        println!("Client disconnected: {:?}", stats);
+        println!("Extension client disconnected: {:?}", stats);
     }
 }
 
