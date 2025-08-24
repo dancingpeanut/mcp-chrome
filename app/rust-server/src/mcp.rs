@@ -33,8 +33,7 @@ impl ServerHandler for ChromeExtensionServer {
         request: Option<PaginatedRequestParam>,
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
-        // tracing::info!("=== {:?}", _context.extensions.get::());
-        // let tools = self.state.get_tools()
+        tracing::info!("=== {:?}", _context);
 
         tracing::info!("Listing tools");
         let input_schema = from_str::<JsonObject>(r#"
