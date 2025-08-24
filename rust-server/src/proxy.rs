@@ -74,7 +74,7 @@ impl ProxyState {
 
         self.send_msg_to_client(client, message).await?;
 
-        info!("Waiting for Chrome response (timeout: {}s)...", timeout_secs);
+        info!("Waiting for response (request_id: {}, timeout: {}s)...", request_id, timeout_secs);
 
         match timeout(Duration::from_secs(timeout_secs), rx).await {
             Ok(Ok(response)) => Ok(response),
