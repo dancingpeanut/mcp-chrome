@@ -90,7 +90,7 @@ impl ProxyState {
         }
     }
 
-    fn handle_client_response(&self, request_id: &str, response: Value) -> Result<()> {
+    pub fn handle_client_response(&self, request_id: &str, response: Value) -> Result<()> {
         if let Some((_, pending)) = self.pending_requests.remove(request_id) {
             if pending.sender.send(response).is_err() {
                 return Err(anyhow!("Failed to send response to waiting handler"));

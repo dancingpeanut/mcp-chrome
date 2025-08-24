@@ -275,9 +275,9 @@ class PythonSSEClient {
       console.log('📤 PythonSSEClient: Sending response to Python server:');
       console.log('   Request ID:', requestId);
       console.log('   Response Data:', responseData);
-      console.log('   Target URL:', `${this.serverUrl}/api/chrome/response`);
+      console.log('   Target URL:', `${this.serverUrl}/api/client/response`);
 
-      const fetchResponse = await fetch(`${this.serverUrl}/api/chrome/response`, {
+      const fetchResponse = await fetch(`${this.serverUrl}/api/client/response`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

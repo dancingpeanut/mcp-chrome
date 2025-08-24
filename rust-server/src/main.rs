@@ -595,12 +595,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let proxy_state = ProxyState::new();
 
     let app = Router::new()
-        // .route("/api/chrome/response", post(chrome_response_handler))
+        // .route("/api/client/response", post(chrome_response_handler))
         // .route("/api/tool/list", get(list_tools_handler))
         // .route("/api/tool/call", get(call_tool_handler))
         // .layer(CorsLayer::permissive())
         // .with_state(state)
         .route("/_sse", get(handler::sse_handler))
+        .route("/api/client/response", post(handler::client_response_handler))
         .with_state(proxy_state);
 
     let addr = "0.0.0.0:12306";
