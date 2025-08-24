@@ -2,8 +2,8 @@ use http::request::Parts;
 use rmcp::handler::server::tool::ToolCallContext;
 use rmcp::model::{CallToolRequestParam, CallToolResult, ErrorCode, Implementation, JsonObject, ListToolsResult, PaginatedRequestParam, ProtocolVersion, ServerCapabilities, ServerInfo, Tool};
 use rmcp::{ErrorData, RoleServer, ServerHandler};
-use rmcp::serde_json::from_str;
 use rmcp::service::RequestContext;
+use serde::{Deserialize, Serialize};
 use crate::proxy::ProxyState;
 
 #[derive(Clone)]
@@ -45,25 +45,20 @@ impl ServerHandler for ChromeExtensionServer {
         _request: Option<PaginatedRequestParam>,
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
-        let parts = _context.extensions.get::<Parts>();
-        tracing::info!("=== parts {:?}", parts);
-
         let client_id = self.get_client_id(&_context)?;
         let tools = self.state.get_tools(client_id).await
             .map_err(|e| ErrorData::new(ErrorCode::INTERNAL_ERROR, e.to_string(), None))?;
 
-        tracing::info!("Listing tools: {:?}", tools);
+        let converted_tools: Vec<ToolConverted> = serde_json::from_str(&serde_json::to_string(&tools).unwrap()).unwrap();
 
-        let input_schema = from_str::<JsonObject>(r#"
-        {
-            "type": "object",
-            "properties": {},
-            "required": []
+        let mut tools = vec![];
+        for tool_c in converted_tools {
+            let tool = Tool::new(tool_c.name, tool_c.description, tool_c.input_schema);
+            tools.push(tool);
         }
-        "#).expect("Failed to parse input schema");
-        let tool = Tool::new("test", "Test tool", input_schema);
+
         // let items = self.tool_router.list_all();
-        Ok(ListToolsResult::with_all_items(vec![tool]))
+        Ok(ListToolsResult::with_all_items(tools))
     }
 
     fn get_info(&self) -> ServerInfo {
@@ -76,4 +71,12 @@ impl ServerHandler for ChromeExtensionServer {
             instructions: Some("Chrome Extension MCP Server.".to_string()),
         }
     }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ToolConverted {
+    pub name: String,
+    pub description: String,
+    #[serde(rename = "inputSchema")]
+    pub input_schema: JsonObject,
 }
