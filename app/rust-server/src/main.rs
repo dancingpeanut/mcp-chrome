@@ -4,11 +4,7 @@ mod handler;
 mod common;
 
 use axum::{
-    extract::{Query, State},
-    http::StatusCode,
-    response::{IntoResponse, Sse},
-    routing::{get, post},
-    Json, Router,
+    routing::{get, post}, Router,
 };
 use tracing::info;
 use crate::proxy::ProxyState;
