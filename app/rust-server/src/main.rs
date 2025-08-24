@@ -46,7 +46,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/client/response", post(handler::client_response))
         .route("/api/tool/list", get(handler::list_tools))
         .route("/api/tool/call", get(handler::call_tool))
-        .with_state(proxy_state);
+        .with_state(proxy_state)
+        .merge(router);
 
     let listener = tokio::net::TcpListener::bind(sse_server.config.bind).await?;
 
