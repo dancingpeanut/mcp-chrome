@@ -3,14 +3,6 @@
     <div class="header">
       <div class="header-content">
 <!--        <h1 class="header-title">MCP Chrome Extension</h1>-->
-        <button
-          class="primary-button"
-          style="margin-left:auto;"
-          :disabled="nativeConnectionStatus !== 'connected'"
-          @click="showChatPanel = true"
-        >
-          💬 对话
-        </button>
       </div>
     </div>
     <div class="content">
@@ -314,7 +306,6 @@ import {
   TabIcon,
   VectorIcon,
 } from './components/icons';
-import ChatPanel from '../chat-panel/ChatPanel.vue';
 
 const nativeConnectionStatus = ref<'unknown' | 'connected' | 'disconnected'>('unknown');
 const isConnecting = ref(false);

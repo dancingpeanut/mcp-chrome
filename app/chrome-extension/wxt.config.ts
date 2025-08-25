@@ -51,7 +51,6 @@ export default defineConfig({
         resources: [
           '/models/*', // 允许访问 public/models/ 下的所有文件
           '/workers/*', // 允许访问 workers 文件
-          '/chat-panel/*', // 允许访问聊天面板相关文件
         ],
         matches: ['<all_urls>'],
       },
@@ -86,10 +85,6 @@ export default defineConfig({
           {
             src: '_locales/**/*',
             dest: '_locales',
-          },
-          {
-            src: 'public/chat-panel/**/*',
-            dest: 'chat-panel',
           },
         ],
       }) as any,
