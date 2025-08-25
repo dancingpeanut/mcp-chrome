@@ -8,7 +8,7 @@ use std::env;
 use axum::{middleware, routing::{get, post}, Router};
 use axum::extract::{Path, Request, State};
 use axum::middleware::Next;
-use axum::response::{IntoResponse, Response};
+use axum::response::Response;
 use http::StatusCode;
 use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
 use rmcp::transport::StreamableHttpService;
