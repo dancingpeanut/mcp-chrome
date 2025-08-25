@@ -1,4 +1,3 @@
-import { initHttpServerListener } from './http-server';
 import {
   initSemanticSimilarityListener,
   initializeSemanticEngineIfCached,
@@ -13,7 +12,6 @@ import { cleanupModelCache } from '@/utils/semantic-similarity-engine';
  */
 export default defineBackground(() => {
   // Initialize core services
-  initHttpServerListener();
   initSemanticSimilarityListener();
   initStorageManagerListener();
   initCloudSSEClient();
