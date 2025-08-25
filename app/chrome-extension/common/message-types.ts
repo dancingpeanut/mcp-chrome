@@ -21,6 +21,9 @@ export const BACKGROUND_MESSAGE_TYPES = {
   REFRESH_SERVER_STATUS: 'refresh_server_status',
   SERVER_STATUS_CHANGED: 'server_status_changed',
   INITIALIZE_SEMANTIC_ENGINE: 'initialize_semantic_engine',
+  CLOUD_SSE_STATUS_CHANGED: 'cloud_sse_status_changed',
+  GET_CLOUD_SSE_CONFIG: 'get_cloud_sse_config',
+  UPDATE_CLOUD_SSE_CONFIG: 'update_cloud_sse_config',
 } as const;
 
 // Offscreen message types

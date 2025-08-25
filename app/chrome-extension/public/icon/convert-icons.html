@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>枫叶图标转换器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .icon-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .icon-item {
+            text-align: center;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+        }
+        .icon-item canvas {
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+        }
+        .download-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .download-btn:hover {
+            background: #45a049;
+        }
+        .instructions {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            border-left: 4px solid #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍁 枫叶图标转换器</h1>
+        
+        <div class="instructions">
+            <h3>使用说明：</h3>
+            <ol>
+                <li>点击下方的"下载"按钮下载对应尺寸的PNG图标</li>
+                <li>将下载的PNG文件重命名为对应的文件名（如16.png, 32.png等）</li>
+                <li>替换 <code>public/icon/</code> 目录中的现有图标文件</li>
+                <li>刷新扩展即可看到新的枫叶图标</li>
+            </ol>
+        </div>
+
+        <div class="icon-preview" id="iconPreview">
+            <!-- 图标预览将在这里生成 -->
+        </div>
+    </div>
+
+    <script>
+        // 枫叶SVG数据
+        const mapleLeafSVG = `
+        <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="leafGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#8B4513;stop-opacity:1" />
+                    <stop offset="50%" style="stop-color:#CD853F;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#D2691E;stop-opacity:1" />
+                </linearGradient>
+                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="2" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.3"/>
+                </filter>
+            </defs>
+            
+            <!-- 枫叶主体 -->
+            <path d="M64 20 C64 20, 45 25, 35 35 C25 45, 20 64, 20 64 C20 64, 25 83, 35 93 C45 103, 64 108, 64 108 C64 108, 83 103, 93 93 C103 83, 108 64, 108 64 C108 64, 103 45, 93 35 C83 25, 64 20, 64 20 Z" 
+                  fill="url(#leafGradient)" 
+                  filter="url(#shadow)"
+                  stroke="#654321" 
+                  stroke-width="2"/>
+            
+            <!-- 枫叶叶脉 -->
+            <path d="M64 20 L64 108" 
+                  stroke="#654321" 
+                  stroke-width="3" 
+                  stroke-linecap="round"/>
+            
+            <path d="M35 35 L93 93" 
+                  stroke="#654321" 
+                  stroke-width="2" 
+                  stroke-linecap="round"/>
+            
+            <path d="M93 35 L35 93" 
+                  stroke="#654321" 
+                  stroke-width="2" 
+                  stroke-linecap="round"/>
+            
+            <!-- 枫叶边缘装饰 -->
+            <path d="M64 20 C64 20, 55 22, 48 28 C41 34, 38 42, 36 50 C34 58, 33 64, 33 64 C33 64, 34 70, 36 78 C38 86, 41 94, 48 100 C55 106, 64 108, 64 108 C64 108, 73 106, 80 100 C87 94, 90 86, 92 78 C94 70, 95 64, 95 64 C95 64, 94 58, 92 50 C90 42, 87 34, 80 28 C73 22, 64 20, 64 20 Z" 
+                  fill="none" 
+                  stroke="#654321" 
+                  stroke-width="1.5" 
+                  opacity="0.6"/>
+            
+            <!-- 中心装饰点 -->
+            <circle cx="64" cy="64" r="4" fill="#654321" opacity="0.8"/>
+        </svg>`;
+
+        // 图标尺寸配置
+        const iconSizes = [
+            { size: 16, filename: '16.png' },
+            { size: 32, filename: '32.png' },
+            { size: 48, filename: '48.png' },
+            { size: 96, filename: '96.png' },
+            { size: 128, filename: '128.png' }
+        ];
+
+        // 生成图标预览和下载按钮
+        function generateIcons() {
+            const container = document.getElementById('iconPreview');
+            
+            iconSizes.forEach(({ size, filename }) => {
+                const iconItem = document.createElement('div');
+                iconItem.className = 'icon-item';
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                canvas.style.width = `${size}px`;
+                canvas.style.height = `${size}px`;
+                
+                const ctx = canvas.getContext('2d');
+                
+                // 创建Image对象来绘制SVG
+                const img = new Image();
+                img.onload = function() {
+                    // 清空画布
+                    ctx.clearRect(0, 0, size, size);
+                    
+                    // 绘制SVG到画布
+                    ctx.drawImage(img, 0, 0, size, size);
+                };
+                
+                // 将SVG转换为Data URL
+                const svgBlob = new Blob([mapleLeafSVG], { type: 'image/svg+xml' });
+                const url = URL.createObjectURL(svgBlob);
+                img.src = url;
+                
+                const sizeLabel = document.createElement('div');
+                sizeLabel.textContent = `${size}x${size}`;
+                sizeLabel.style.fontWeight = 'bold';
+                sizeLabel.style.marginBottom = '5px';
+                
+                const downloadBtn = document.createElement('button');
+                downloadBtn.className = 'download-btn';
+                downloadBtn.textContent = '下载';
+                downloadBtn.onclick = () => downloadIcon(canvas, filename);
+                
+                iconItem.appendChild(sizeLabel);
+                iconItem.appendChild(canvas);
+                iconItem.appendChild(downloadBtn);
+                
+                container.appendChild(iconItem);
+            });
+        }
+
+        // 下载图标函数
+        function downloadIcon(canvas, filename) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        // 页面加载完成后生成图标
+        window.onload = generateIcons;
+    </script>
+</body>
+</html>
