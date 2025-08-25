@@ -22,6 +22,10 @@ impl ProxyState {
         }
     }
 
+    pub fn exists_client(&self, client_id: &str) -> bool {
+        self.clients.contains_key(client_id)
+    }
+
     pub async fn connect_to_client(&self, client_id: String) -> (ExtensionClient, GuardedSseStream<ClientListener>) {
         let (tx, rx) = mpsc::unbounded_channel();
         let client = ExtensionClient {

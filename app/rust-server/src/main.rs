@@ -6,9 +6,10 @@ mod mcp;
 
 use std::env;
 use axum::{middleware, routing::{get, post}, Router};
-use axum::extract::{Path, Request};
+use axum::extract::{Path, Request, State};
 use axum::middleware::Next;
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Response};
+use http::StatusCode;
 use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
 use rmcp::transport::StreamableHttpService;
 use tracing_subscriber::layer::SubscriberExt;
@@ -16,10 +17,14 @@ use tracing_subscriber::util::SubscriberInitExt;
 use crate::mcp::ChromeExtensionServer;
 use crate::proxy::ProxyState;
 
-async fn inject_client_id(Path(client_id): Path<String>, mut req: Request, next: Next) -> impl IntoResponse {
+async fn inject_client_id(State(proxy_state): State<ProxyState>, Path(client_id): Path<String>, mut req: Request, next: Next) -> Result<Response, StatusCode> {
+    if !proxy_state.exists_client(&client_id) {
+        tracing::warn!("Client not found: {}", client_id);
+        return Err(StatusCode::UNAUTHORIZED)
+    }
     tracing::info!("MCP client request, client_id: {}", client_id);
     req.headers_mut().insert("client_id", client_id.parse().unwrap());
-    next.run(req).await
+    Ok(next.run(req).await)
 }
 
 #[tokio::main]
@@ -42,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Default::default(),
     );
     let mcp_router = Router::new().nest_service("/{client_id}/mcp", mcp_service)
-        .layer(middleware::from_fn(inject_client_id));
+        .layer(middleware::from_fn_with_state(proxy_state.clone(), inject_client_id));
 
     let router = Router::new()
         .route("/_sse", get(handler::sse))
