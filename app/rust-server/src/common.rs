@@ -8,11 +8,11 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiResponse<T> {
     pub request_id: Option<String>,
-    pub(crate) success: bool,
+    pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) data: Option<T>,
+    pub data: Option<T>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) error: Option<String>,
+    pub error: Option<String>,
 }
 
 impl <T> ApiResponse<T> {
@@ -67,7 +67,7 @@ pub struct SseMessage {
     message_type: String,
     payload: Option<Value>,
     timestamp: DateTime<Utc>,
-    pub(crate) request_id: String,
+    pub request_id: String,
 }
 
 impl SseMessage {

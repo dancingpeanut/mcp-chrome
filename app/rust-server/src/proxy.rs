@@ -115,7 +115,7 @@ impl ProxyState {
         Err(anyhow!("Failed to get tools from extension client"))
     }
 
-    pub(crate) async fn get_tools(&self, client_id: &str) -> Result<Vec<Value>> {
+    pub async fn get_tools(&self, client_id: &str) -> Result<Vec<Value>> {
         let client = self.clients.get(client_id)
             .map(|c| c.clone())
             .ok_or_else(|| anyhow!("Client {} not found", client_id))?;
@@ -191,5 +191,5 @@ impl GuardListener for ClientListener {
 
 #[derive(Debug)]
 pub struct PendingRequest {
-    pub(crate) sender: oneshot::Sender<ApiResponse<Value>>,
+    pub sender: oneshot::Sender<ApiResponse<Value>>,
 }

@@ -72,7 +72,7 @@ pub struct GuardedSseStream<T: GuardListener> {
 }
 
 impl<T: GuardListener> GuardedSseStream<T> {
-    pub(crate) fn new(
+    pub fn new(
         rx: mpsc::UnboundedReceiver<String>,
         listener: T,
         heartbeat_interval: Option<Duration>,

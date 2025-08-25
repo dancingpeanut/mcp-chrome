@@ -34,7 +34,7 @@ pub async fn sse(
     )
 }
 
-pub(crate) async fn client_response(
+pub async fn client_response(
     State(state): State<ProxyState>,
     Json(client_response): Json<ApiResponse<Value>>,
 ) -> impl IntoResponse {
@@ -80,7 +80,7 @@ pub async fn list_tools(
     }
 }
 
-pub(crate) async fn call_tool(
+pub async fn call_tool(
     Query(params): Query<ClientQuery>,
     State(state): State<ProxyState>,
 ) -> impl IntoResponse {
