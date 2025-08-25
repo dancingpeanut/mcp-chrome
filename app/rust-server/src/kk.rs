@@ -4,7 +4,6 @@ use rmcp::{
     model::{CallToolRequestParam, ClientCapabilities, ClientInfo, Implementation},
     transport::StreamableHttpClientTransport,
 };
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 pub async fn test_client() -> Result<()> {
     let transport = StreamableHttpClientTransport::from_uri("http://127.0.0.1:10824/2f5b15b5-f210-494b-854f-5323104fb6b9/mcp");

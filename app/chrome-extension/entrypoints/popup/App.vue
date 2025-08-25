@@ -29,6 +29,18 @@
           <SidePanelIcon class="button-icon" />
           <span>打开侧边栏</span>
         </button>
+        
+        <!-- SidePanel 设置选项 -->
+        <div class="side-panel-settings">
+          <label class="setting-checkbox">
+            <input 
+              type="checkbox" 
+              v-model="autoClosePopup" 
+              @change="saveSidePanelSettings"
+            />
+            <span class="setting-label">打开侧边栏后自动关闭弹窗</span>
+          </label>
+        </div>
       </div>
 
       <!-- 其他部分使用 v-if="false" 隐藏，但保留代码 -->
@@ -395,6 +407,7 @@ const showChatPanel = ref(false);
 
 // SidePanel 相关
 const showSidePanel = ref(false);
+const autoClosePopup = ref(true); // 控制是否自动关闭popup
 
 // Cache management
 const isManagingCache = ref(false);
@@ -1105,6 +1118,32 @@ const checkSidePanelSupport = () => {
   return { supported: true };
 };
 
+// 保存SidePanel设置
+const saveSidePanelSettings = async () => {
+  try {
+    await chrome.storage.local.set({ 
+      sidePanelSettings: { 
+        autoClosePopup: autoClosePopup.value 
+      } 
+    });
+    console.log('SidePanel settings saved');
+  } catch (error) {
+    console.error('Failed to save SidePanel settings:', error);
+  }
+};
+
+// 加载SidePanel设置
+const loadSidePanelSettings = async () => {
+  try {
+    const result = await chrome.storage.local.get(['sidePanelSettings']);
+    if (result.sidePanelSettings) {
+      autoClosePopup.value = result.sidePanelSettings.autoClosePopup ?? true;
+    }
+  } catch (error) {
+    console.error('Failed to load SidePanel settings:', error);
+  }
+};
+
 const openChromeSidePanel = async () => {
   try {
     // 首先检查API支持
@@ -1141,6 +1180,14 @@ const openChromeSidePanel = async () => {
     });
     
     console.log('Chrome SidePanel opened successfully');
+    
+    // 根据用户设置决定是否自动关闭popup
+    if (autoClosePopup.value) {
+      // 延迟500ms关闭，让用户能看到成功消息
+      setTimeout(() => {
+        window.close();
+      }, 500);
+    }
   } catch (error) {
     console.error('Failed to open Chrome SidePanel:', error);
     
@@ -1329,6 +1376,7 @@ const setupServerStatusListener = () => {
 onMounted(async () => {
   await loadPortPreference();
   await loadModelPreference();
+  await loadSidePanelSettings(); // 加载SidePanel设置
   await checkNativeConnection();
   await checkServerStatus();
   await refreshStorageStats();
@@ -2023,6 +2071,33 @@ onUnmounted(() => {
 
 .button-icon {
   font-size: 20px;
+}
+
+.side-panel-settings {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.setting-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #374151;
+}
+
+.setting-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #8b5cf6;
+}
+
+.setting-label {
+  user-select: none;
 }
 
 .icon-small {
