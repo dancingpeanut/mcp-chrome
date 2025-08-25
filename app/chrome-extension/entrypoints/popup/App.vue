@@ -26,7 +26,7 @@
       <!-- SidePanel 打开按钮 -->
       <div class="section">
         <button class="side-panel-button" @click="openChromeSidePanel">
-          <SidePanelIcon class="button-icon" />
+          <span class="button-icon">📋</span>
           <span>打开侧边栏</span>
         </button>
         
@@ -297,15 +297,6 @@
       />
     </div>
     <ChatPanel v-if="showChatPanel" @close="showChatPanel = false" />
-    <SidePanel 
-      v-if="showSidePanel" 
-      :visible="showSidePanel"
-      :native-connection-status="nativeConnectionStatus"
-      :server-status="serverStatus"
-      @close="showSidePanel = false"
-      @refresh-status="handleRefreshStatus"
-      @open-chat="handleOpenChat"
-    />
   </div>
 </template>
 
@@ -326,7 +317,7 @@ import ConfirmDialog from './components/ConfirmDialog.vue';
 import ProgressIndicator from './components/ProgressIndicator.vue';
 import ModelCacheManagement from './components/ModelCacheManagement.vue';
 import CloudSSEStatus from './components/CloudSSEStatus.vue';
-import SidePanel from './components/SidePanel.vue';
+
 import ChatPanel from './components/ChatPanel.vue';
 import {
   DocumentIcon,
@@ -336,7 +327,6 @@ import {
   CheckIcon,
   TabIcon,
   VectorIcon,
-  SidePanelIcon,
 } from './components/icons';
 
 const nativeConnectionStatus = ref<'unknown' | 'connected' | 'disconnected'>('unknown');
@@ -406,7 +396,6 @@ const semanticEngineLastUpdated = ref<number | null>(null);
 const showChatPanel = ref(false);
 
 // SidePanel 相关
-const showSidePanel = ref(false);
 const autoClosePopup = ref(true); // 控制是否自动关闭popup
 
 // Cache management
@@ -1081,14 +1070,7 @@ const hideClearDataConfirmation = () => {
   showClearConfirmation.value = false;
 };
 
-const handleRefreshStatus = async () => {
-  await checkNativeConnection();
-  await checkServerStatus();
-};
 
-const handleOpenChat = () => {
-  showChatPanel.value = true;
-};
 
 // 检查Chrome版本和SidePanel API支持
 const checkSidePanelSupport = () => {
@@ -1186,7 +1168,7 @@ const openChromeSidePanel = async () => {
       // 延迟500ms关闭，让用户能看到成功消息
       setTimeout(() => {
         window.close();
-      }, 500);
+      }, 100);
     }
   } catch (error) {
     console.error('Failed to open Chrome SidePanel:', error);

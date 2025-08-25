@@ -47,7 +47,7 @@ export default defineConfig({
       'sidePanel', // 添加侧边栏权限
     ],
     side_panel: {
-      default_path: 'sidepanel.html'
+      default_path: 'panel.html'
     },
     host_permissions: ['<all_urls>'],
     web_accessible_resources: [
@@ -91,11 +91,7 @@ export default defineConfig({
             dest: '_locales',
           },
           {
-            src: 'public/sidepanel.*',
-            dest: '',
-          },
-          {
-            src: 'public/test-sidepanel.html',
+            src: 'public/panel.*',
             dest: '',
           },
         ],
