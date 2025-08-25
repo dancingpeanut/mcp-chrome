@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Chrome Extension - SidePanel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            overflow-x: hidden;
+        }
+
+        .sidepanel-container {
+            padding: 16px;
+            max-width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .header-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .header-subtitle {
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .section {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-icon {
+            font-size: 18px;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .status-item {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: #64748b;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-value {
+            font-size: 14px;
+            font-weight: 600;
+            padding: 6px 10px;
+            border-radius: 6px;
+            text-align: center;
+            display: inline-block;
+        }
+
+        .status-value.status-connected {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-value.status-disconnected {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+
+        .status-value.status-unknown {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .status-value.status-running {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .status-value.status-stopped {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .action-button {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            text-align: left;
+            width: 100%;
+        }
+
+        .action-button.primary {
+            background: #8b5cf6;
+            color: white;
+        }
+
+        .action-button.primary:hover {
+            background: #7c3aed;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        .action-button.secondary {
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+        }
+
+        .action-button.secondary:hover {
+            background: #e2e8f0;
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+        }
+
+        .action-icon {
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .quick-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .stat-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .activity-list {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .activity-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-time {
+            font-size: 12px;
+            color: #64748b;
+            font-weight: 500;
+            min-width: 50px;
+        }
+
+        .activity-text {
+            font-size: 14px;
+            color: #374151;
+        }
+
+        .refresh-button {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .refresh-button:hover {
+            background: #7c3aed;
+            transform: scale(1.1);
+        }
+
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .error-message {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 12px;
+            color: #dc2626;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        @media (max-width: 400px) {
+            .sidepanel-container {
+                padding: 12px;
+            }
+            
+            .quick-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidepanel-container">
+        <div class="header">
+            <h1 class="header-title">MCP Chrome Extension</h1>
+            <p class="header-subtitle">智能浏览器助手</p>
+        </div>
+
+        <div class="section">
+            <h3 class="section-title">
+                <span class="section-icon">📊</span>
+                系统状态
+            </h3>
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-label">连接状态</div>
+                    <div id="connection-status" class="status-value status-unknown">
+                        检测中...
+                    </div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">服务器状态</div>
+                    <div id="server-status" class="status-value status-unknown">
+                        检测中...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3 class="section-title">
+                <span class="section-icon">⚡</span>
+                快速操作
+            </h3>
+            <div class="action-buttons">
+                <button class="action-button primary" id="open-chat-btn">
+                    <span class="action-icon">💬</span>
+                    <span>打开聊天</span>
+                </button>
+                <button class="action-button secondary" id="refresh-status-btn">
+                    <span class="action-icon">🔄</span>
+                    <span>刷新状态</span>
+                </button>
+                <button class="action-button secondary" id="open-settings-btn">
+                    <span class="action-icon">⚙️</span>
+                    <span>设置</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3 class="section-title">
+                <span class="section-icon">📈</span>
+                快速统计
+            </h3>
+            <div class="quick-stats">
+                <div class="stat-card">
+                    <div id="indexed-pages" class="stat-value">-</div>
+                    <div class="stat-label">已索引页面</div>
+                </div>
+                <div class="stat-card">
+                    <div id="active-tabs" class="stat-value">-</div>
+                    <div class="stat-label">活跃标签页</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3 class="section-title">
+                <span class="section-icon">📝</span>
+                最近活动
+            </h3>
+            <div class="activity-list">
+                <div class="activity-item">
+                    <span class="activity-time" id="current-time">--:--</span>
+                    <span class="activity-text">SidePanel 已打开</span>
+                </div>
+                <div class="activity-item">
+                    <span class="activity-time" id="last-check-time">--:--</span>
+                    <span class="activity-text">系统状态检查</span>
+                </div>
+            </div>
+        </div>
+
+        <button class="refresh-button" id="refresh-all-btn" title="刷新所有数据">
+            🔄
+        </button>
+    </div>
+
+    <script src="sidepanel.js"></script>
+</body>
+</html>

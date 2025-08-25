@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SidePanel API 测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+        .test-button {
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-size: 14px;
+        }
+        .test-button:hover {
+            background: #7c3aed;
+        }
+        .test-button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+        .error {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+        .info {
+            background: #dbeafe;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+        }
+        .warning {
+            background: #fef3c7;
+            color: #d97706;
+            border: 1px solid #fed7aa;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chrome SidePanel API 测试页面</h1>
+    
+    <div class="test-section">
+        <h2>1. 检查Chrome版本和API支持</h2>
+        <button class="test-button" onclick="checkChromeVersion()">检查Chrome版本</button>
+        <button class="test-button" onclick="checkSidePanelAPI()">检查SidePanel API</button>
+        <div id="version-result"></div>
+        <div id="api-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. 测试SidePanel功能</h2>
+        <button class="test-button" onclick="testOpenSidePanel()">测试打开SidePanel</button>
+        <button class="test-button" onclick="testSetOptions()">测试设置选项</button>
+        <div id="open-result"></div>
+        <div id="options-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. 手动操作指南</h2>
+        <p><strong>如果API测试失败，请手动打开SidePanel：</strong></p>
+        <ul>
+            <li><strong>Windows/Linux:</strong> 按 <code>Ctrl + Shift + E</code></li>
+            <li><strong>Mac:</strong> 按 <code>Cmd + Shift + E</code></li>
+            <li>或者点击Chrome地址栏右侧的侧边栏图标</li>
+        </ul>
+        <p>然后在侧边栏中选择"MCP Chrome Extension"标签页。</p>
+    </div>
+
+    <script>
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.className = `result ${type}`;
+            element.textContent = message;
+        }
+
+        function checkChromeVersion() {
+            const userAgent = navigator.userAgent;
+            const chromeMatch = userAgent.match(/Chrome\/(\d+)/);
+            
+            if (chromeMatch) {
+                const version = parseInt(chromeMatch[1]);
+                console.log('Chrome version:', version);
+                
+                if (version >= 114) {
+                    showResult('version-result', `✅ Chrome版本: ${version} (支持SidePanel API)`, 'success');
+                } else {
+                    showResult('version-result', `❌ Chrome版本: ${version} (需要114或更高版本)`, 'error');
+                }
+            } else {
+                showResult('version-result', '❌ 无法检测Chrome版本', 'error');
+            }
+        }
+
+        function checkSidePanelAPI() {
+            if (chrome.sidePanel) {
+                console.log('SidePanel API available:', chrome.sidePanel);
+                
+                const methods = Object.getOwnPropertyNames(chrome.sidePanel);
+                console.log('Available methods:', methods);
+                
+                if (chrome.sidePanel.open) {
+                    showResult('api-result', `✅ SidePanel API可用\n可用方法: ${methods.join(', ')}`, 'success');
+                } else {
+                    showResult('api-result', `⚠️ SidePanel API存在但open方法不可用\n可用方法: ${methods.join(', ')}`, 'warning');
+                }
+            } else {
+                showResult('api-result', '❌ SidePanel API不可用', 'error');
+            }
+        }
+
+        function testOpenSidePanel() {
+            if (chrome.sidePanel && typeof chrome.sidePanel.open === 'function') {
+                try {
+                    // 获取当前活动标签页
+                    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+                        if (chrome.runtime.lastError) {
+                            showResult('open-result', `❌ 获取标签页失败: ${chrome.runtime.lastError.message}`, 'error');
+                            return;
+                        }
+                        
+                        if (tabs && tabs.length > 0) {
+                            const currentTab = tabs[0];
+                            console.log('Opening SidePanel for tab:', currentTab.id);
+                            
+                            // 在当前标签页中打开SidePanel
+                            chrome.sidePanel.open({ tabId: currentTab.id }, function() {
+                                if (chrome.runtime.lastError) {
+                                    showResult('open-result', `❌ 打开失败: ${chrome.runtime.lastError.message}`, 'error');
+                                } else {
+                                    showResult('open-result', '✅ SidePanel打开成功！', 'success');
+                                }
+                            });
+                        } else {
+                            showResult('open-result', '❌ 无法获取当前标签页', 'error');
+                        }
+                    });
+                } catch (error) {
+                    showResult('open-result', `❌ 调用失败: ${error.message}`, 'error');
+                }
+            } else {
+                showResult('open-result', '❌ SidePanel.open方法不可用', 'error');
+            }
+        }
+
+        function testSetOptions() {
+            if (chrome.sidePanel && chrome.sidePanel.setOptions) {
+                try {
+                    chrome.sidePanel.setOptions({
+                        path: 'sidepanel.html',
+                        enabled: true
+                    }, function() {
+                        if (chrome.runtime.lastError) {
+                            showResult('options-result', `❌ 设置选项失败: ${chrome.runtime.lastError.message}`, 'error');
+                        } else {
+                            showResult('options-result', '✅ 设置选项成功！', 'success');
+                        }
+                    });
+                } catch (error) {
+                    showResult('options-result', `❌ 调用失败: ${error.message}`, 'error');
+                }
+            } else {
+                showResult('options-result', '❌ SidePanel.setOptions方法不可用', 'error');
+            }
+        }
+
+        // 页面加载时自动检查
+        window.addEventListener('load', function() {
+            checkChromeVersion();
+            checkSidePanelAPI();
+        });
+    </script>
+</body>
+</html>

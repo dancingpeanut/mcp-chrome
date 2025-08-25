@@ -23,6 +23,14 @@
         <CloudSSEStatus />
       </div>
 
+      <!-- SidePanel 打开按钮 -->
+      <div class="section">
+        <button class="side-panel-button" @click="openChromeSidePanel">
+          <SidePanelIcon class="button-icon" />
+          <span>打开侧边栏</span>
+        </button>
+      </div>
+
       <!-- 其他部分使用 v-if="false" 隐藏，但保留代码 -->
       <div v-if="false" class="section">
         <h2 class="section-title">{{ getMessage('nativeServerConfigLabel') }}</h2>
@@ -277,6 +285,15 @@
       />
     </div>
     <ChatPanel v-if="showChatPanel" @close="showChatPanel = false" />
+    <SidePanel 
+      v-if="showSidePanel" 
+      :visible="showSidePanel"
+      :native-connection-status="nativeConnectionStatus"
+      :server-status="serverStatus"
+      @close="showSidePanel = false"
+      @refresh-status="handleRefreshStatus"
+      @open-chat="handleOpenChat"
+    />
   </div>
 </template>
 
@@ -297,6 +314,8 @@ import ConfirmDialog from './components/ConfirmDialog.vue';
 import ProgressIndicator from './components/ProgressIndicator.vue';
 import ModelCacheManagement from './components/ModelCacheManagement.vue';
 import CloudSSEStatus from './components/CloudSSEStatus.vue';
+import SidePanel from './components/SidePanel.vue';
+import ChatPanel from './components/ChatPanel.vue';
 import {
   DocumentIcon,
   DatabaseIcon,
@@ -305,6 +324,7 @@ import {
   CheckIcon,
   TabIcon,
   VectorIcon,
+  SidePanelIcon,
 } from './components/icons';
 
 const nativeConnectionStatus = ref<'unknown' | 'connected' | 'disconnected'>('unknown');
@@ -372,6 +392,9 @@ const semanticEngineLastUpdated = ref<number | null>(null);
 
 // 对话面板相关
 const showChatPanel = ref(false);
+
+// SidePanel 相关
+const showSidePanel = ref(false);
 
 // Cache management
 const isManagingCache = ref(false);
@@ -1043,6 +1066,96 @@ const refreshStorageStats = async () => {
 
 const hideClearDataConfirmation = () => {
   showClearConfirmation.value = false;
+};
+
+const handleRefreshStatus = async () => {
+  await checkNativeConnection();
+  await checkServerStatus();
+};
+
+const handleOpenChat = () => {
+  showChatPanel.value = true;
+};
+
+// 检查Chrome版本和SidePanel API支持
+const checkSidePanelSupport = () => {
+  const userAgent = navigator.userAgent;
+  const chromeMatch = userAgent.match(/Chrome\/(\d+)/);
+  
+  if (chromeMatch) {
+    const version = parseInt(chromeMatch[1]);
+    console.log('Chrome version:', version);
+    
+    if (version < 114) {
+      console.warn('Chrome version too old for SidePanel API');
+      return { supported: false, reason: 'Chrome版本过低，需要114或更高版本' };
+    }
+  }
+  
+  if (!chrome.sidePanel) {
+    console.warn('SidePanel API not available');
+    return { supported: false, reason: 'SidePanel API不可用' };
+  }
+  
+  if (typeof chrome.sidePanel.open !== 'function') {
+    console.warn('SidePanel.open method not available');
+    return { supported: false, reason: 'SidePanel.open方法不可用' };
+  }
+  
+  return { supported: true };
+};
+
+const openChromeSidePanel = async () => {
+  try {
+    // 首先检查API支持
+    const support = checkSidePanelSupport();
+    if (!support.supported) {
+      throw new Error(support.reason);
+    }
+    
+    // 使用正确的API调用方式，需要指定tabId或windowId
+    await new Promise((resolve, reject) => {
+      // 获取当前活动标签页
+      chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        
+        if (tabs && tabs.length > 0) {
+          const currentTab = tabs[0];
+          console.log('Opening SidePanel for tab:', currentTab.id);
+          
+          // 在当前标签页中打开SidePanel
+          chrome.sidePanel.open({ tabId: currentTab.id }, function() {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              resolve();
+            }
+          });
+        } else {
+          reject(new Error('无法获取当前标签页'));
+        }
+      });
+    });
+    
+    console.log('Chrome SidePanel opened successfully');
+  } catch (error) {
+    console.error('Failed to open Chrome SidePanel:', error);
+    
+    let errorMessage = '打开侧边栏失败\n\n';
+    errorMessage += '可能的解决方案：\n';
+    errorMessage += '1. 确保Chrome版本为114或更高\n';
+    errorMessage += '2. 手动打开侧边栏：\n';
+    errorMessage += '   - 按 Ctrl+Shift+E (Windows/Linux)\n';
+    errorMessage += '   - 或按 Cmd+Shift+E (Mac)\n';
+    errorMessage += '   - 或点击地址栏右侧的侧边栏图标\n';
+    errorMessage += '3. 检查扩展权限是否正确\n\n';
+    errorMessage += '错误详情：' + error.message;
+    
+    alert(errorMessage);
+  }
 };
 
 const confirmClearAllData = async () => {
@@ -1879,6 +1992,37 @@ onUnmounted(() => {
 .danger-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.side-panel-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  font-size: 16px;
+}
+
+.side-panel-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+}
+
+.side-panel-button:active {
+  transform: translateY(0);
+}
+
+.button-icon {
+  font-size: 20px;
 }
 
 .icon-small {

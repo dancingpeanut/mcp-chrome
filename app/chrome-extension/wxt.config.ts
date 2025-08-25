@@ -44,7 +44,11 @@ export default defineConfig({
       'storage',
       'background', // 添加后台权限
       'alarms', // 添加闹钟权限用于保活
+      'sidePanel', // 添加侧边栏权限
     ],
+    side_panel: {
+      default_path: 'sidepanel.html'
+    },
     host_permissions: ['<all_urls>'],
     web_accessible_resources: [
       {
@@ -85,6 +89,14 @@ export default defineConfig({
           {
             src: '_locales/**/*',
             dest: '_locales',
+          },
+          {
+            src: 'public/sidepanel.*',
+            dest: '',
+          },
+          {
+            src: 'public/test-sidepanel.html',
+            dest: '',
           },
         ],
       }) as any,

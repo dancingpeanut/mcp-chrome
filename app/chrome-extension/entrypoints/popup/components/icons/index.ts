@@ -5,3 +5,4 @@ export { default as TrashIcon } from './TrashIcon.vue';
 export { default as CheckIcon } from './CheckIcon.vue';
 export { default as TabIcon } from './TabIcon.vue';
 export { default as VectorIcon } from './VectorIcon.vue';
+export { default as SidePanelIcon } from './SidePanelIcon.vue';

@@ -8,7 +8,15 @@ anyhow = "1.0"
 axum = { version = "0.8", features = [] }
 tokio = { version = "1", features = ["sync", "macros", "rt", "time", "rt-multi-thread", "signal"] }
 tracing = { version = "0.1" }
-rmcp = { version = "0.6", features = ["server", "transport-streamable-http-server", "transport-worker"] }
+rmcp = { version = "0.6", features = [
+    "server",
+    "transport-streamable-http-server",
+    "transport-worker",
+    "client",
+    "transport-sse-client",
+    "reqwest",
+    "transport-streamable-http-client",
+] }
 tracing-subscriber = { version = "0.3", features = [
     "env-filter",
     "std",

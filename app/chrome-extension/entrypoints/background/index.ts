@@ -31,6 +31,35 @@ export default defineBackground(() => {
       sendResponse({ success: true, timestamp: Date.now() });
       return true;
     }
+
+    // 处理SidePanel消息
+    if (message.type === 'OPEN_CHAT_PANEL') {
+      console.log('Background: Opening chat panel from SidePanel');
+      // 这里可以添加打开聊天面板的逻辑
+      sendResponse({ success: true });
+      return true;
+    }
+
+    if (message.type === 'OPEN_SETTINGS') {
+      console.log('Background: Opening settings from SidePanel');
+      // 这里可以添加打开设置的逻辑
+      sendResponse({ success: true });
+      return true;
+    }
+
+    if (message.type === 'GET_SERVER_STATUS') {
+      console.log('Background: Getting server status for SidePanel');
+      // 返回服务器状态
+      sendResponse({ 
+        success: true, 
+        serverStatus: {
+          isRunning: false, // 这里需要根据实际情况返回
+          port: 12306,
+          lastUpdated: Date.now()
+        }
+      });
+      return true;
+    }
   });
 
   // 设置闹钟监听器保持活跃

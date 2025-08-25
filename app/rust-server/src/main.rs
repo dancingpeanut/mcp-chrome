@@ -2,7 +2,8 @@ mod proxy;
 mod guard_sse_stream;
 mod handler;
 mod common;
-mod mcp;
+mod mcp_server;
+mod kk;
 
 use std::env;
 use axum::{middleware, routing::{get, post}, Router};
@@ -13,7 +14,7 @@ use rmcp::transport::streamable_http_server::session::local::LocalSessionManager
 use rmcp::transport::StreamableHttpService;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use crate::mcp::ChromeExtensionServer;
+use crate::mcp_server::ChromeExtensionServer;
 use crate::proxy::ProxyState;
 
 async fn inject_client_id(Path(client_id): Path<String>, mut req: Request, next: Next) -> impl IntoResponse {
@@ -49,6 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/client/response", post(handler::client_response))
         .route("/api/tool/list", get(handler::list_tools))
         .route("/api/tool/call", get(handler::call_tool))
+        .route("/test_client", get(handler::test_client))
         .with_state(proxy_state.clone())
         .merge(mcp_router);
 

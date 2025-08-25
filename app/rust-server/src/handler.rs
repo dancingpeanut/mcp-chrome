@@ -8,6 +8,7 @@ use futures_util::Stream;
 use serde::{Deserialize};
 use serde_json::Value;
 use crate::common::{ApiResponse, MessageType, SseMessage};
+use crate::kk;
 use crate::proxy::ProxyState;
 
 #[derive(Deserialize)]
@@ -102,4 +103,9 @@ pub(crate) async fn call_tool(
             )
         }
     }
+}
+
+pub async fn test_client() -> impl IntoResponse {
+    kk::test_client().await.unwrap();
+    ""
 }

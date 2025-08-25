@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SidePanel 功能演示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .demo-container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .demo-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 16px;
+        }
+
+        .demo-subtitle {
+            font-size: 18px;
+            color: #64748b;
+            margin-bottom: 32px;
+            line-height: 1.6;
+        }
+
+        .feature-list {
+            text-align: left;
+            margin-bottom: 32px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .feature-item:last-child {
+            border-bottom: none;
+        }
+
+        .feature-icon {
+            font-size: 20px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .feature-text {
+            font-size: 16px;
+            color: #374151;
+        }
+
+        .demo-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .demo-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+        }
+
+        .demo-button:active {
+            transform: translateY(0);
+        }
+
+        .note {
+            margin-top: 24px;
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border-left: 4px solid #8b5cf6;
+        }
+
+        .note-text {
+            font-size: 14px;
+            color: #64748b;
+            line-height: 1.5;
+        }
+
+        .highlight {
+            color: #8b5cf6;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <h1 class="demo-title">SidePanel 功能演示</h1>
+        <p class="demo-subtitle">
+            这是一个Chrome扩展的SidePanel功能演示页面，展示了如何实现一个美观的侧边栏窗口。
+        </p>
+
+        <div class="feature-list">
+            <div class="feature-item">
+                <span class="feature-icon">🎯</span>
+                <span class="feature-text">固定位置侧边栏，从右侧滑入</span>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">🎨</span>
+                <span class="feature-text">现代化的UI设计，支持响应式布局</span>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">⚡</span>
+                <span class="feature-text">平滑的CSS动画和过渡效果</span>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">🔄</span>
+                <span class="feature-text">实时状态同步和刷新功能</span>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">📱</span>
+                <span class="feature-text">移动端友好的响应式设计</span>
+            </div>
+        </div>
+
+        <button class="demo-button" onclick="showDemoSidePanel()">
+            查看演示效果
+        </button>
+
+        <div class="note">
+            <p class="note-text">
+                <span class="highlight">注意：</span>
+                这个演示页面展示了SidePanel的UI效果。要体验完整功能，请安装Chrome扩展并在popup中点击"打开侧边栏"按钮。
+            </p>
+        </div>
+    </div>
+
+    <!-- 演示用的SidePanel -->
+    <div id="demo-sidepanel" class="demo-sidepanel-overlay" style="display: none;">
+        <div class="demo-sidepanel" onclick="event.stopPropagation()">
+            <div class="demo-sidepanel-header">
+                <h2>演示 SidePanel</h2>
+                <button class="demo-close-button" onclick="hideDemoSidePanel()">×</button>
+            </div>
+            <div class="demo-sidepanel-content">
+                <p>这是一个演示用的SidePanel，展示了实际的UI效果。</p>
+                <p>在真实的Chrome扩展中，这里会显示系统状态、快速操作等功能。</p>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .demo-sidepanel-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            display: flex;
+            justify-content: flex-end;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .demo-sidepanel {
+            width: 400px;
+            height: 100vh;
+            background: white;
+            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .demo-sidepanel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #f8fafc;
+        }
+
+        .demo-sidepanel-header h2 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .demo-close-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            color: #64748b;
+            transition: all 0.2s ease;
+            font-size: 20px;
+            font-weight: 300;
+        }
+
+        .demo-close-button:hover {
+            background: #e2e8f0;
+            color: #374151;
+        }
+
+        .demo-sidepanel-content {
+            flex: 1;
+            padding: 24px;
+            color: #374151;
+            line-height: 1.6;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+
+        @media (max-width: 480px) {
+            .demo-sidepanel {
+                width: 100vw;
+            }
+        }
+    </style>
+
+    <script>
+        function showDemoSidePanel() {
+            const overlay = document.getElementById('demo-sidepanel');
+            overlay.style.display = 'flex';
+        }
+
+        function hideDemoSidePanel() {
+            const overlay = document.getElementById('demo-sidepanel');
+            overlay.style.display = 'none';
+        }
+
+        // 点击遮罩层关闭SidePanel
+        document.getElementById('demo-sidepanel').addEventListener('click', hideDemoSidePanel);
+    </script>
+</body>
+</html>
