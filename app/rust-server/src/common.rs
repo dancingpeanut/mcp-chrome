@@ -1,7 +1,10 @@
 use chrono::{DateTime, Utc};
+use rootcause::Report;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
+
+pub type Result<T, E = Report> = std::result::Result<T, E>;
 
 // Data structures
 

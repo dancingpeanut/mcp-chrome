@@ -1,11 +1,13 @@
-use anyhow::{anyhow, Result};
+// use anyhow::{anyhow, Result};
 use std::sync::Arc;
 use std::time::Duration;
 use dashmap::DashMap;
+use rootcause::prelude::ResultExt;
+use rootcause::report;
 use serde_json::Value;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::timeout;
-use crate::common::{ApiResponse, MessageType, SseMessage};
+use crate::common::{ApiResponse, MessageType, Result, SseMessage};
 use crate::guard_sse_stream::{GuardListener, GuardedSseStream, SseStats};
 
 #[derive(Clone)]
@@ -55,8 +57,8 @@ impl ProxyState {
     /// 向client端发送消息
     pub async fn send_msg_to_client(&self, client: &ExtensionClient, message: SseMessage) -> Result<()> {
         let msg_content = serde_json::to_string(&message)?;
-        client.sender.send(msg_content)
-            .map_err(|e| anyhow!("Failed to send message to extension client {}: {}", client.client_id, e))
+        client.sender.send(msg_content).context("Failed to send message to extension client")?;
+        Ok(())
     }
 
     /// 请求client端，并等待结果
@@ -80,12 +82,12 @@ impl ProxyState {
             Ok(Ok(response)) => Ok(response),
             Ok(Err(_)) => {
                 self.pending_requests.remove(&request_id);
-                Err(anyhow!("Channel closed"))
+                Err(report!("Channel closed"))
             }
             Err(_) => {
                 tracing::warn!("Request timeout after {}s", timeout_secs);
                 self.pending_requests.remove(&request_id);
-                Err(anyhow!("Request timeout"))
+                Err(report!("Request timeout"))
             }
         }
     }
@@ -93,7 +95,7 @@ impl ProxyState {
     pub fn handle_client_response(&self, request_id: &str, response: ApiResponse<Value>) -> Result<()> {
         if let Some((_, pending)) = self.pending_requests.remove(request_id) {
             if pending.sender.send(response).is_err() {
-                return Err(anyhow!("Failed to send response to waiting handler"));
+                return Err(report!("Failed to send response to waiting handler"));
             } else {
                 tracing::info!("Response handled for request {}", request_id);
             }
@@ -111,18 +113,18 @@ impl ProxyState {
         if response.success {
             if let Some(data) = response.data {
                 let tools = data.as_array().cloned()
-                    .ok_or_else(|| anyhow!("Invalid response format"))?;
+                    .ok_or_else(|| report!("Invalid response format"))?;
                 return Ok(tools);
             }
         }
 
-        Err(anyhow!("Failed to get tools from extension client"))
+        Err(report!("Failed to get tools from extension client"))
     }
 
     pub(crate) async fn get_tools(&self, client_id: &str) -> Result<Vec<Value>> {
         let client = self.clients.get(client_id)
             .map(|c| c.clone())
-            .ok_or_else(|| anyhow!("Client {} not found", client_id))?;
+            .ok_or_else(|| report!("Client {} not found", client_id))?;
 
         let tools_guard_client = client.clone();
         {
@@ -149,7 +151,7 @@ impl ProxyState {
         );
         let client = self.clients.get(client_id)
             .map(|c| c.clone())
-            .ok_or_else(|| anyhow!("Extension client {} not found", client_id))?;
+            .ok_or_else(|| report!("Extension client {} not found", client_id))?;
         let message = SseMessage::from_message_type(MessageType::CallTool(tool_name.to_string(), args));
         let response = self.request_client(&client, message, 300).await?;
 
@@ -160,7 +162,7 @@ impl ProxyState {
         } else {
             tracing::error!("Failed to call tool: {:?}", response.error);
         }
-        Err(anyhow!("Failed to call tool: {}", tool_name))
+        Err(report!("Failed to call tool: {}", tool_name))
     }
 }
 
